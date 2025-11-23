@@ -1,0 +1,77 @@
+@import "tailwindcss";
+
+/* Texas Ranch Color Theme */
+@theme {
+  /* Primary Colors - Sunset & Ranch */
+  --color-sunset-orange: #d97746;
+  --color-sunset-red: #c14a3a;
+  --color-sunset-pink: #e8826f;
+  
+  /* Earth Tones - Clay, Dirt, Sand */
+  --color-clay-dark: #8b4513;
+  --color-clay: #a0522d;
+  --color-clay-light: #c5866f;
+  --color-dirt: #6b5444;
+  --color-sand: #d4b896;
+  --color-sand-light: #e8d5bb;
+  
+  /* Leather Tones */
+  --color-leather-dark: #3d2817;
+  --color-leather: #5c3d2e;
+  --color-leather-light: #7d5a46;
+  
+  /* Greens - Dark Grassy Texas Green */
+  --color-grass-dark: #3a4a2e;
+  --color-grass: #4d5e3f;
+  --color-grass-light: #6b7c5d;
+  
+  /* Water - Little Lakes */
+  --color-lake-dark: #2d4654;
+  --color-lake: #3d5c6e;
+  --color-lake-light: #5d7c8e;
+  
+  /* Neutrals */
+  --color-stone-dark: #2a2520;
+  --color-stone: #3d3530;
+  --color-stone-light: #4d443f;
+  --color-warm-gray-50: #faf9f7;
+  --color-warm-gray-100: #f5f3f0;
+  --color-warm-gray-200: #e8e4df;
+  --color-warm-gray-300: #d4ccc3;
+  --color-warm-gray-600: #7d7269;
+  --color-warm-gray-700: #5c534a;
+  --color-warm-gray-800: #3d3530;
+  --color-warm-gray-900: #2a2520;
+  
+  /* Semantic Color Mappings */
+  --color-primary: var(--color-clay);
+  --color-primary-dark: var(--color-clay-dark);
+  --color-primary-light: var(--color-clay-light);
+  
+  --color-accent: var(--color-sunset-orange);
+  --color-accent-dark: var(--color-sunset-red);
+  --color-accent-light: var(--color-sunset-pink);
+  
+  --color-bg-primary: var(--color-warm-gray-100);
+  --color-bg-secondary: var(--color-sand-light);
+  --color-bg-dark: var(--color-stone-dark);
+  
+  --color-text-primary: var(--color-stone-dark);
+  --color-text-secondary: var(--color-leather);
+  --color-text-light: var(--color-warm-gray-600);
+}
+
+:root {
+  font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+  background-color: var(--color-bg-primary);
+  color: var(--color-text-primary);
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+  background-color: var(--color-bg-primary);
+}
