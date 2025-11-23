@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react';
+import { useParams } from 'react-router-dom';
 import { collection, query, where, orderBy, onSnapshot } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { useUsers } from '../hooks/useUsers';
 import { MapPin, FileText, Calendar, Loader2, ArrowLeft } from 'lucide-react';
 import ProfilePicture from '../components/ProfilePicture';
 
-const UserProfile = ({ userId, onBack }) => {
+const UserProfile = ({ onBack }) => {
+  const { userId } = useParams();
   const { users } = useUsers();
   const [userPosts, setUserPosts] = useState([]);
   const [loadingPosts, setLoadingPosts] = useState(true);

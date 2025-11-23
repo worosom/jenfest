@@ -1,12 +1,8 @@
 import { createContext, useContext, useEffect, useState } from 'react';
-import { 
-  GoogleAuthProvider, 
-  signInWithPopup, 
-  signOut as firebaseSignOut,
-  onAuthStateChanged 
-} from 'firebase/auth';
+import { useAuth0 } from '@auth0/auth0-react';
 import { doc, getDoc, setDoc, onSnapshot } from 'firebase/firestore';
-import { auth, db } from '../config/firebase';
+import { signInWithCustomToken } from 'firebase/auth';
+import { db, auth } from '../config/firebase';
 
 const AuthContext = createContext({});
 
@@ -19,29 +15,84 @@ export const useAuth = () => {
 };
 
 export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const { user: auth0User, isLoading, loginWithRedirect, logout: auth0Logout, getAccessTokenSilently } = useAuth0();
   const [userProfile, setUserProfile] = useState(null);
+  const [syncing, setSyncing] = useState(false);
+  const [firebaseUser, setFirebaseUser] = useState(null);
+
+  // Authenticate with Firebase using Auth0 token
+  useEffect(() => {
+    const authenticateWithFirebase = async () => {
+      if (!auth0User) {
+        setFirebaseUser(null);
+        return;
+      }
+
+      try {
+        // Get Auth0 access token
+        const auth0Token = await getAccessTokenSilently();
+
+        // Exchange for Firebase custom token
+        const response = await fetch('/.netlify/functions/getFirebaseToken', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ auth0Token }),
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to get Firebase token');
+        }
+
+        const { firebaseToken } = await response.json();
+
+        // Sign in to Firebase with custom token
+        await signInWithCustomToken(auth, firebaseToken);
+        setFirebaseUser(auth.currentUser);
+      } catch (error) {
+        console.error('Error authenticating with Firebase:', error);
+      }
+    };
+
+    authenticateWithFirebase();
+  }, [auth0User, getAccessTokenSilently]);
+
+  // Create a normalized user object that matches Firebase structure
+  const user = auth0User ? {
+    uid: auth0User.sub, // Auth0 user ID (e.g., "auth0|123456")
+    displayName: auth0User.name || auth0User.nickname || 'Anonymous',
+    photoURL: auth0User.picture || '',
+    email: auth0User.email || '',
+  } : null;
 
   useEffect(() => {
     let unsubscribeProfile = null;
     
-    const unsubscribeAuth = onAuthStateChanged(auth, async (firebaseUser) => {
-      if (firebaseUser) {
-        setUser(firebaseUser);
+    const syncUserProfile = async () => {
+      // Wait for both Auth0 user AND Firebase auth to be ready
+      if (!user || !firebaseUser) {
+        setUserProfile(null);
+        if (unsubscribeProfile) {
+          unsubscribeProfile();
+          unsubscribeProfile = null;
+        }
+        return;
+      }
+
+      setSyncing(true);
+      
+      try {
+        const userRef = doc(db, 'users', user.uid);
         
-        // Set up real-time listener for user profile
-        const userRef = doc(db, 'users', firebaseUser.uid);
-        
-        // First check if profile exists
+        // Check if profile exists
         const userSnap = await getDoc(userRef);
         
         if (!userSnap.exists()) {
           // Create new user profile
           const newProfile = {
-            uid: firebaseUser.uid,
-            displayName: firebaseUser.displayName || '',
-            photoURL: firebaseUser.photoURL || '',
+            uid: user.uid,
+            displayName: user.displayName,
+            photoURL: user.photoURL,
+            email: user.email,
             campLocation: null,
             bio: '',
           };
@@ -53,34 +104,30 @@ export const AuthProvider = ({ children }) => {
           if (doc.exists()) {
             setUserProfile(doc.data());
           }
+          setSyncing(false);
         });
-        
-        setLoading(false);
-      } else {
-        setUser(null);
-        setUserProfile(null);
-        setLoading(false);
-        
-        // Unsubscribe from profile listener if exists
-        if (unsubscribeProfile) {
-          unsubscribeProfile();
-          unsubscribeProfile = null;
-        }
+      } catch (error) {
+        console.error('Error syncing user profile:', error);
+        setSyncing(false);
       }
-    });
+    };
+
+    syncUserProfile();
 
     return () => {
-      unsubscribeAuth();
       if (unsubscribeProfile) {
         unsubscribeProfile();
       }
     };
-  }, []);
+  }, [user?.uid, firebaseUser]);
 
   const signInWithGoogle = async () => {
-    const provider = new GoogleAuthProvider();
     try {
-      await signInWithPopup(auth, provider);
+      await loginWithRedirect({
+        authorizationParams: {
+          connection: 'google-oauth2',
+        },
+      });
     } catch (error) {
       console.error('Error signing in with Google:', error);
       throw error;
@@ -89,7 +136,11 @@ export const AuthProvider = ({ children }) => {
 
   const signOut = async () => {
     try {
-      await firebaseSignOut(auth);
+      await auth0Logout({
+        logoutParams: {
+          returnTo: window.location.origin,
+        },
+      });
     } catch (error) {
       console.error('Error signing out:', error);
       throw error;
@@ -99,7 +150,7 @@ export const AuthProvider = ({ children }) => {
   const value = {
     user,
     userProfile,
-    loading,
+    loading: isLoading || syncing,
     signInWithGoogle,
     signOut,
   };

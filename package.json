@@ -4,20 +4,26 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "vite --host 0.0.0.0",
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview"
   },
   "dependencies": {
+    "@auth0/auth0-react": "^2.9.0",
+    "@netlify/vite-plugin": "^2.7.14",
     "date-fns": "^4.1.0",
     "firebase": "^12.6.0",
+    "firebase-admin": "^13.6.0",
+    "jsonwebtoken": "^9.0.2",
+    "jwks-rsa": "^3.2.0",
     "leaflet": "^1.9.4",
     "lucide-react": "^0.554.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "react-dropzone": "^14.3.8",
-    "react-leaflet": "^5.0.0"
+    "react-leaflet": "^5.0.0",
+    "react-router-dom": "^7.9.6"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",

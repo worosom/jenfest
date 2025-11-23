@@ -28,7 +28,7 @@ const LoginModal = ({ isOpen, onClose, onSuccess }) => {
       <div className="bg-[var(--color-sand-light)] border-2 border-[var(--color-leather)] rounded-lg max-w-md w-full p-6 shadow-2xl">
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
-          <h2 className="text-2xl font-bold text-[var(--color-text-primary)]">Sign In to JenFest</h2>
+          <h2 className="text-2xl font-bold text-[var(--color-text-primary)]">Sign In to Jenfest</h2>
           <button
             onClick={onClose}
             className="p-2 hover:bg-[var(--color-warm-gray-200)] rounded-full transition-colors"

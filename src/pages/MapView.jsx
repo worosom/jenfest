@@ -52,6 +52,10 @@ const MapView = ({ onViewUserProfile }) => {
     allUsers.forEach(userData => {
       if (userData.campLocation) {
         const userInfo = users[userData.uid];
+        const truncatedBio = userInfo?.bio && userInfo.bio.length > 120 
+          ? userInfo.bio.substring(0, 120) + '...' 
+          : userInfo?.bio;
+        
         newMarkers.push({
           id: `user-${userData.id}-${userInfo?.photoURL}`,
           type: 'user',
@@ -59,22 +63,26 @@ const MapView = ({ onViewUserProfile }) => {
           y: userData.campLocation.y,
           icon: createCustomIcon('user'),
           popup: (
-            <div className="text-center">
+            <div className="min-w-[200px]">
               <button
                 onClick={() => onViewUserProfile?.(userData.uid)}
-                className="flex flex-col items-center hover:opacity-80 transition-opacity"
+                className="w-full hover:opacity-80 transition-opacity"
               >
-                <div className="flex justify-center mb-2">
+                <div className="flex items-center gap-3 mb-2">
                   <ProfilePicture 
                     src={userInfo?.photoURL} 
                     alt={userInfo?.displayName || 'User'}
                     size="md"
                   />
+                  <p className="font-semibold hover:text-purple-600 transition-colors text-left">
+                    {userInfo?.displayName || 'Anonymous'}
+                  </p>
                 </div>
-                <p className="font-semibold hover:text-purple-600 transition-colors">
-                  {userInfo?.displayName || 'Anonymous'}
-                </p>
-                {userInfo?.bio && <p className="text-sm text-gray-600">{userInfo.bio}</p>}
+                {truncatedBio && (
+                  <p className="text-sm text-gray-600 text-left mt-2">
+                    {truncatedBio}
+                  </p>
+                )}
               </button>
             </div>
           )
@@ -164,7 +172,7 @@ const MapView = ({ onViewUserProfile }) => {
         markers={markers}
         onMapClick={handleMapClick}
         isSelectionMode={false}
-        className="h-[calc(100vh-8rem)]"
+        className="h-[calc(100dvh-8rem)]"
       />
       
       {selectedCoords && (

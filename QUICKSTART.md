@@ -5,7 +5,7 @@
 ### Create Firebase Project
 1. Go to [Firebase Console](https://console.firebase.google.com)
 2. Click "Add project"
-3. Name it "JenFest" (or your preferred name)
+3. Name it "Jenfest" (or your preferred name)
 4. Disable Google Analytics (optional)
 5. Click "Create project"
 
@@ -74,7 +74,7 @@ service firebase.storage {
 2. Click "Project settings"
 3. Scroll down to "Your apps"
 4. Click web icon (</>) to add a web app
-5. Register app with nickname "JenFest Web"
+5. Register app with nickname "Jenfest Web"
 6. Copy the firebaseConfig object
 
 ## 2. Local Setup

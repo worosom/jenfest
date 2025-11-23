@@ -16,7 +16,7 @@ const Login = () => {
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-600 via-pink-500 to-orange-400">
       <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full mx-4">
         <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold text-gray-800 mb-2">JenFest</h1>
+          <h1 className="text-4xl font-bold text-gray-800 mb-2">Jenfest</h1>
           <p className="text-gray-600">Your Festival Companion</p>
         </div>
         

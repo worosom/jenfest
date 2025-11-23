@@ -72,6 +72,35 @@
 body {
   margin: 0;
   min-width: 320px;
-  min-height: 100vh;
+  min-height: 100dvh;
   background-color: var(--color-bg-primary);
+}
+
+/* Fix Leaflet map z-index to not block modals and FAB */
+.leaflet-container {
+  z-index: 1 !important;
+}
+
+.leaflet-pane {
+  z-index: 2 !important;
+}
+
+.leaflet-top,
+.leaflet-bottom {
+  z-index: 3 !important;
+}
+
+/* Ensure popups stay above map but below modals */
+.leaflet-popup-pane {
+  z-index: 4 !important;
+}
+
+/* Keep leaflet controls accessible */
+.leaflet-control-container {
+  z-index: 5 !important;
+}
+
+/* Override Leaflet popup paragraph margins for better layout */
+.leaflet-popup-content p {
+  margin: 0 !important;
 }

@@ -1,4 +1,4 @@
-# JenFest
+# Jenfest
 
 A festival companion app for when you need to find your friends but cell service is trash.
 
