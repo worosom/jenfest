@@ -3,13 +3,17 @@ import { doc, updateDoc, collection, query, where, orderBy, onSnapshot, deleteDo
 import { ref, uploadBytes, getDownloadURL, listAll, deleteObject } from 'firebase/storage';
 import { db, storage } from '../config/firebase';
 import { useAuth } from '../hooks/useAuth';
-import { MapPin, Save, Camera, Loader2, Calendar, Trash2, FileText, Edit2, AlertTriangle } from 'lucide-react';
+import { useRSVP } from '../hooks/useRSVP';
+import { MapPin, Save, Camera, Loader2, FileText, AlertTriangle, Trash2 } from 'lucide-react';
 import MapComponent from '../components/Map/MapComponent';
 import ProfilePicture from '../components/ProfilePicture';
-import EditPostModal from '../components/EditPostModal';
+import Post from '../components/Post';
+import PostFormModal from '../components/PostFormModal';
+import AttendeesModal from '../components/AttendeesModal';
 
-const Profile = () => {
+const Profile = ({ onNavigateToMap }) => {
   const { user, userProfile, signOut } = useAuth();
+  const { toggleRSVP } = useRSVP();
   const [isEditingLocation, setIsEditingLocation] = useState(false);
   const [displayName, setDisplayName] = useState('');
   const [bio, setBio] = useState('');
@@ -20,6 +24,7 @@ const Profile = () => {
   const [userPosts, setUserPosts] = useState([]);
   const [loadingPosts, setLoadingPosts] = useState(true);
   const [editingPost, setEditingPost] = useState(null);
+  const [selectedActivity, setSelectedActivity] = useState(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const fileInputRef = useRef(null);
@@ -407,102 +412,33 @@ const Profile = () => {
         ) : (
           <div className="space-y-4">
             {userPosts.map(post => (
-              <div key={post.id} className="border border-[var(--color-warm-gray-300)] bg-white rounded-lg p-4 hover:border-[var(--color-clay-light)] transition-colors">
-                {/* Header with timestamp */}
-                <div className="flex items-start justify-between mb-3">
-                  <div className="flex items-center gap-2">
-                    {post.isActivity && (
-                      <div className="flex items-center gap-1 text-[var(--color-clay)] text-sm font-medium">
-                        <Calendar size={16} />
-                        <span>Activity</span>
-                      </div>
-                    )}
-                  </div>
-                  <p className="text-xs text-[var(--color-text-light)]">
-                    {post.createdAt?.toDate().toLocaleString()}
-                  </p>
-                </div>
-
-                {post.isActivity && post.scheduledAt && (
-                  <div className="mb-2 text-sm text-[var(--color-text-secondary)] flex items-center gap-1">
-                    <Calendar size={14} />
-                    <span>
-                      {post.scheduledAt.toDate().toLocaleDateString('en-US', {
-                        weekday: 'short',
-                        month: 'short',
-                        day: 'numeric',
-                        hour: 'numeric',
-                        minute: '2-digit'
-                      })}
-                    </span>
-                  </div>
-                )}
-
-                {post.title && (
-                  <h3 className="text-lg font-bold text-[var(--color-text-primary)] mb-2">{post.title}</h3>
-                )}
-
-                <p className="text-[var(--color-text-secondary)] mb-3">{post.content}</p>
-
-                {post.media && post.media.length > 0 && (
-                  <div className="rounded-lg overflow-hidden mb-3">
-                    <img 
-                      src={post.media[0].url} 
-                      alt="Post media"
-                      className="w-full max-h-64 object-cover"
-                    />
-                  </div>
-                )}
-
-                {/* Author info at bottom */}
-                <div className="flex items-center justify-between gap-2 pt-2 border-t border-[var(--color-warm-gray-300)]">
-                  <div className="flex items-center gap-2">
-                    <ProfilePicture
-                      src={userProfile?.photoURL}
-                      alt={userProfile?.displayName || 'User'}
-                      size="sm"
-                    />
-                    <span className="text-xs text-[var(--color-text-secondary)] font-medium">
-                      {userProfile?.displayName || 'Anonymous'}
-                    </span>
-                  </div>
-                  <div className="flex gap-1">
-                    <button
-                      onClick={() => setEditingPost(post)}
-                      className="p-2 text-[var(--color-lake)] hover:bg-[var(--color-warm-gray-100)] rounded-lg transition-colors"
-                      title="Edit post"
-                    >
-                      <Edit2 size={18} />
-                    </button>
-                    <button
-                      onClick={() => deletePost(post.id)}
-                      className="p-2 text-[var(--color-sunset-red)] hover:bg-[var(--color-warm-gray-100)] rounded-lg transition-colors"
-                      title="Delete post"
-                    >
-                      <Trash2 size={18} />
-                    </button>
-                  </div>
-                </div>
-
-                {post.isActivity && (
-                  <div className="flex items-center gap-4 text-sm text-[var(--color-text-light)] mt-3 pt-3 border-t border-[var(--color-warm-gray-300)]">
-                    <span>{post.attendees?.length || 0} attending</span>
-                    {post.mapLocation && (
-                      <span className="flex items-center gap-1">
-                        <MapPin size={14} />
-                        Location tagged
-                      </span>
-                    )}
-                  </div>
-                )}
-              </div>
+              <Post
+                key={post.id}
+                post={post}
+                currentUserId={user?.uid}
+                author={userProfile}
+                onNavigateToMap={onNavigateToMap}
+                onEdit={setEditingPost}
+                onDelete={deletePost}
+                onToggleRSVP={toggleRSVP}
+                onViewAttendees={setSelectedActivity}
+                showEditDelete={true}
+              />
             ))}
           </div>
         )}
       </div>
 
+      {/* Attendees Modal */}
+      <AttendeesModal
+        isOpen={!!selectedActivity}
+        onClose={() => setSelectedActivity(null)}
+        attendees={selectedActivity?.attendees || []}
+        activityTitle={selectedActivity?.title || selectedActivity?.content}
+      />
+
       {/* Edit Post Modal */}
-      <EditPostModal
+      <PostFormModal
         isOpen={!!editingPost}
         onClose={() => setEditingPost(null)}
         post={editingPost}

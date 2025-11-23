@@ -1,14 +1,16 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useDropzone } from 'react-dropzone';
-import { X, Image as ImageIcon, Calendar, MapPin, Loader2 } from 'lucide-react';
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { X, Image as ImageIcon, Calendar, MapPin, Loader2, Save } from 'lucide-react';
+import { collection, addDoc, serverTimestamp, doc, updateDoc } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, storage } from '../config/firebase';
 import { useAuth } from '../hooks/useAuth';
 import MapComponent from './Map/MapComponent';
 
-const CreatePostModal = ({ isOpen, onClose }) => {
-  const { user, userProfile } = useAuth();
+const PostFormModal = ({ isOpen, onClose, post = null }) => {
+  const { user } = useAuth();
+  const isEditMode = !!post;
+  
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [isActivity, setIsActivity] = useState(false);
@@ -18,6 +20,41 @@ const CreatePostModal = ({ isOpen, onClose }) => {
   const [uploading, setUploading] = useState(false);
   const [mapLocation, setMapLocation] = useState(null);
   const [isSelectingLocation, setIsSelectingLocation] = useState(false);
+
+  // Reset form when modal opens/closes or post changes
+  useEffect(() => {
+    if (isOpen) {
+      if (post) {
+        // Edit mode - populate with existing post data
+        setTitle(post.title || '');
+        setContent(post.content || '');
+        setIsActivity(post.isActivity || false);
+        setMapLocation(post.mapLocation || null);
+
+        // Set scheduled date/time if exists
+        if (post.scheduledAt) {
+          const date = post.scheduledAt.toDate();
+          const dateStr = date.toISOString().split('T')[0];
+          const timeStr = date.toTimeString().slice(0, 5);
+          setScheduledDate(dateStr);
+          setScheduledTime(timeStr);
+        } else {
+          setScheduledDate('');
+          setScheduledTime('');
+        }
+      } else {
+        // Create mode - reset form
+        setTitle('');
+        setContent('');
+        setIsActivity(false);
+        setScheduledDate('');
+        setScheduledTime('');
+        setSelectedImages([]);
+        setMapLocation(null);
+        setIsSelectingLocation(false);
+      }
+    }
+  }, [isOpen, post]);
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     accept: {
@@ -81,43 +118,65 @@ const CreatePostModal = ({ isOpen, onClose }) => {
     setUploading(true);
 
     try {
-      let mediaUrls = [];
+      if (isEditMode) {
+        // Update existing post
+        const postRef = doc(db, 'posts', post.id);
+        const updateData = {
+          title: title.trim() || null,
+          content: content.trim(),
+          mapLocation: mapLocation,
+          isActivity,
+        };
 
-      // Upload images if any
-      if (selectedImages.length > 0) {
-        for (const { file } of selectedImages) {
-          const resizedBlob = await resizeImage(file);
-          const filename = `posts/${user.uid}/${Date.now()}_${file.name}`;
-          const storageRef = ref(storage, filename);
-          await uploadBytes(storageRef, resizedBlob);
-          const url = await getDownloadURL(storageRef);
-          mediaUrls.push({ type: 'image', url });
+        // Update scheduled date if activity
+        if (isActivity && scheduledDate && scheduledTime) {
+          const datetime = new Date(`${scheduledDate}T${scheduledTime}`);
+          updateData.scheduledAt = datetime;
+        } else if (!isActivity) {
+          updateData.scheduledAt = null;
         }
+
+        await updateDoc(postRef, updateData);
+      } else {
+        // Create new post
+        let mediaUrls = [];
+
+        // Upload images if any
+        if (selectedImages.length > 0) {
+          for (const { file } of selectedImages) {
+            const resizedBlob = await resizeImage(file);
+            const filename = `posts/${user.uid}/${Date.now()}_${file.name}`;
+            const storageRef = ref(storage, filename);
+            await uploadBytes(storageRef, resizedBlob);
+            const url = await getDownloadURL(storageRef);
+            mediaUrls.push({ type: 'image', url });
+          }
+        }
+
+        // Prepare post data
+        const postData = {
+          authorId: user.uid,
+          title: title.trim() || null,
+          content: content.trim(),
+          media: mediaUrls,
+          mapLocation: mapLocation,
+          isActivity,
+          scheduledAt: null,
+          attendees: [],
+          createdAt: serverTimestamp(),
+        };
+
+        // Add scheduled date if activity
+        if (isActivity && scheduledDate && scheduledTime) {
+          const datetime = new Date(`${scheduledDate}T${scheduledTime}`);
+          postData.scheduledAt = datetime;
+        }
+
+        // Create post
+        await addDoc(collection(db, 'posts'), postData);
       }
 
-      // Prepare post data - only store authorId, look up user data when displaying
-      const postData = {
-        authorId: user.uid,
-        title: title.trim() || null,
-        content: content.trim(),
-        media: mediaUrls,
-        mapLocation: mapLocation,
-        isActivity,
-        scheduledAt: null,
-        attendees: [],
-        createdAt: serverTimestamp(),
-      };
-
-      // Add scheduled date if activity
-      if (isActivity && scheduledDate && scheduledTime) {
-        const datetime = new Date(`${scheduledDate}T${scheduledTime}`);
-        postData.scheduledAt = datetime;
-      }
-
-      // Create post
-      await addDoc(collection(db, 'posts'), postData);
-
-      // Reset form
+      // Reset form and close
       setTitle('');
       setContent('');
       setIsActivity(false);
@@ -128,8 +187,8 @@ const CreatePostModal = ({ isOpen, onClose }) => {
       setIsSelectingLocation(false);
       onClose();
     } catch (error) {
-      console.error('Error creating post:', error);
-      alert('Error creating post. Please try again.');
+      console.error(`Error ${isEditMode ? 'updating' : 'creating'} post:`, error);
+      alert(`Error ${isEditMode ? 'updating' : 'creating'} post. Please try again.`);
     } finally {
       setUploading(false);
     }
@@ -149,10 +208,13 @@ const CreatePostModal = ({ isOpen, onClose }) => {
       <div className="bg-[var(--color-sand-light)] border-2 border-[var(--color-leather)] rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-[var(--color-warm-gray-300)] sticky top-0 bg-[var(--color-sand-light)]">
-          <h2 className="text-xl font-bold text-[var(--color-text-primary)]">Create Post</h2>
+          <h2 className="text-xl font-bold text-[var(--color-text-primary)]">
+            {isEditMode ? 'Edit Post' : 'Create Post'}
+          </h2>
           <button
             onClick={onClose}
             className="p-2 hover:bg-[var(--color-warm-gray-200)] rounded-full transition-colors"
+            disabled={uploading}
           >
             <X size={20} />
           </button>
@@ -236,53 +298,62 @@ const CreatePostModal = ({ isOpen, onClose }) => {
             </div>
           )}
 
-          {/* Image Upload */}
-          <div>
-            <label className="block text-sm font-medium text-[var(--color-text-primary)] mb-2">
-              Add Photo
-            </label>
-            {selectedImages.length === 0 ? (
-              <div
-                {...getRootProps()}
-                className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors ${
-                  isDragActive
-                    ? 'border-[var(--color-clay)] bg-[var(--color-warm-gray-100)]'
-                    : 'border-[var(--color-warm-gray-300)] hover:border-[var(--color-clay-light)]'
-                } ${uploading ? 'opacity-50 cursor-not-allowed' : ''}`}
-              >
-                <input {...getInputProps()} disabled={uploading} />
-                <ImageIcon size={48} className="mx-auto mb-3 text-[var(--color-warm-gray-600)]" />
-                {isDragActive ? (
-                  <p className="text-[var(--color-clay)]">Drop the image here</p>
-                ) : (
-                  <div>
-                    <p className="text-[var(--color-text-secondary)] mb-1">
-                      Drag and drop an image, or click to select
-                    </p>
-                    <p className="text-xs text-[var(--color-text-light)]">
-                      JPEG, PNG, GIF, WebP (max 10MB)
-                    </p>
-                  </div>
-                )}
-              </div>
-            ) : (
-              <div className="relative">
-                <img
-                  src={selectedImages[0].preview}
-                  alt="Preview"
-                  className="w-full rounded-lg"
-                />
-                <button
-                  type="button"
-                  onClick={removeImage}
-                  disabled={uploading}
-                  className="absolute top-2 right-2 p-2 bg-[var(--color-sunset-red)] text-white rounded-full hover:bg-[var(--color-clay-dark)] transition-colors disabled:opacity-50"
+          {/* Image Upload - Only show for new posts */}
+          {!isEditMode && (
+            <div>
+              <label className="block text-sm font-medium text-[var(--color-text-primary)] mb-2">
+                Add Photo
+              </label>
+              {selectedImages.length === 0 ? (
+                <div
+                  {...getRootProps()}
+                  className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors ${
+                    isDragActive
+                      ? 'border-[var(--color-clay)] bg-[var(--color-warm-gray-100)]'
+                      : 'border-[var(--color-warm-gray-300)] hover:border-[var(--color-clay-light)]'
+                  } ${uploading ? 'opacity-50 cursor-not-allowed' : ''}`}
                 >
-                  <X size={16} />
-                </button>
-              </div>
-            )}
-          </div>
+                  <input {...getInputProps()} disabled={uploading} />
+                  <ImageIcon size={48} className="mx-auto mb-3 text-[var(--color-warm-gray-600)]" />
+                  {isDragActive ? (
+                    <p className="text-[var(--color-clay)]">Drop the image here</p>
+                  ) : (
+                    <div>
+                      <p className="text-[var(--color-text-secondary)] mb-1">
+                        Drag and drop an image, or click to select
+                      </p>
+                      <p className="text-xs text-[var(--color-text-light)]">
+                        JPEG, PNG, GIF, WebP (max 10MB)
+                      </p>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="relative">
+                  <img
+                    src={selectedImages[0].preview}
+                    alt="Preview"
+                    className="w-full rounded-lg"
+                  />
+                  <button
+                    type="button"
+                    onClick={removeImage}
+                    disabled={uploading}
+                    className="absolute top-2 right-2 p-2 bg-[var(--color-sunset-red)] text-white rounded-full hover:bg-[var(--color-clay-dark)] transition-colors disabled:opacity-50"
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Note about media in edit mode */}
+          {isEditMode && post.media && post.media.length > 0 && (
+            <div className="p-3 bg-[var(--color-lake-light)] bg-opacity-20 border border-[var(--color-lake-light)] text-[var(--color-lake-dark)] text-sm rounded-lg">
+              Note: Photos cannot be changed after posting. To change the photo, please delete and recreate the post.
+            </div>
+          )}
 
           {/* Map Location */}
           <div>
@@ -297,14 +368,24 @@ const CreatePostModal = ({ isOpen, onClose }) => {
                     Location tagged at X: {Math.round(mapLocation.x)}, Y: {Math.round(mapLocation.y)}
                   </span>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setIsSelectingLocation(!isSelectingLocation)}
-                  disabled={uploading}
-                  className="text-sm text-[var(--color-clay)] hover:text-[var(--color-clay-dark)] font-medium"
-                >
-                  {isSelectingLocation ? 'Close Map' : 'Change'}
-                </button>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsSelectingLocation(!isSelectingLocation)}
+                    disabled={uploading}
+                    className="text-sm text-[var(--color-clay)] hover:text-[var(--color-clay-dark)] font-medium"
+                  >
+                    {isSelectingLocation ? 'Close Map' : 'Change'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setMapLocation(null)}
+                    disabled={uploading}
+                    className="text-sm text-[var(--color-sunset-red)] hover:text-[var(--color-clay-dark)] font-medium"
+                  >
+                    Remove
+                  </button>
+                </div>
               </div>
             ) : (
               <button
@@ -339,24 +420,54 @@ const CreatePostModal = ({ isOpen, onClose }) => {
           )}
 
           {/* Submit Button */}
-          <button
-            type="submit"
-            disabled={uploading || !content.trim()}
-            className="w-full bg-[var(--color-clay)] text-white py-3 px-6 rounded-lg hover:bg-[var(--color-clay-dark)] transition-colors font-semibold disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-lg"
-          >
-            {uploading ? (
-              <>
-                <Loader2 size={20} className="animate-spin" />
-                Posting...
-              </>
-            ) : (
-              'Post'
-            )}
-          </button>
+          {isEditMode ? (
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={onClose}
+                disabled={uploading}
+                className="flex-1 bg-[var(--color-warm-gray-200)] text-[var(--color-text-secondary)] py-3 px-6 rounded-lg hover:bg-[var(--color-warm-gray-300)] transition-colors font-semibold disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={uploading || !content.trim()}
+                className="flex-1 bg-[var(--color-clay)] text-white py-3 px-6 rounded-lg hover:bg-[var(--color-clay-dark)] transition-colors font-semibold disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-lg"
+              >
+                {uploading ? (
+                  <>
+                    <Loader2 size={20} className="animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <Save size={20} />
+                    Save Changes
+                  </>
+                )}
+              </button>
+            </div>
+          ) : (
+            <button
+              type="submit"
+              disabled={uploading || !content.trim()}
+              className="w-full bg-[var(--color-clay)] text-white py-3 px-6 rounded-lg hover:bg-[var(--color-clay-dark)] transition-colors font-semibold disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-lg"
+            >
+              {uploading ? (
+                <>
+                  <Loader2 size={20} className="animate-spin" />
+                  Posting...
+                </>
+              ) : (
+                'Post'
+              )}
+            </button>
+          )}
         </form>
       </div>
     </div>
   );
 };
 
-export default CreatePostModal;
+export default PostFormModal;

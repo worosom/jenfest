@@ -25,7 +25,7 @@ import UsersDirectory from "./UsersDirectory";
 import UserProfile from "./UserProfile";
 import TermsOfService from "./TermsOfService";
 import PrivacyPolicy from "./PrivacyPolicy";
-import CreatePostModal from "../components/CreatePostModal";
+import PostFormModal from "../components/PostFormModal";
 import LoginModal from "../components/LoginModal";
 
 const Home = () => {
@@ -117,7 +117,7 @@ const Home = () => {
         <Routes>
           <Route
             path="/"
-            element={<Feed onViewUserProfile={handleViewUserProfile} />}
+            element={<Feed onViewUserProfile={handleViewUserProfile} onNavigateToMap={(location) => navigate('/map', { state: { centerLocation: location } })} />}
           />
           <Route
             path="/map"
@@ -137,15 +137,15 @@ const Home = () => {
             path="/profile"
             element={
               user ? (
-                <Profile />
+                <Profile onNavigateToMap={(location) => navigate('/map', { state: { centerLocation: location } })} />
               ) : (
-                <Feed onViewUserProfile={handleViewUserProfile} />
+                <Feed onViewUserProfile={handleViewUserProfile} onNavigateToMap={(location) => navigate('/map', { state: { centerLocation: location } })} />
               )
             }
           />
           <Route
             path="/user/:userId"
-            element={<UserProfile onBack={() => navigate(-1)} />}
+            element={<UserProfile onBack={() => navigate(-1)} onNavigateToMap={(location) => navigate('/map', { state: { centerLocation: location } })} />}
           />
           <Route
             path="/terms"
@@ -171,7 +171,7 @@ const Home = () => {
 
       {/* Create Post Modal */}
       {user && (
-        <CreatePostModal
+        <PostFormModal
           isOpen={isCreatePostOpen}
           onClose={() => setIsCreatePostOpen(false)}
         />

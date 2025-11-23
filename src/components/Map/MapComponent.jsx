@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { MapContainer, ImageOverlay, Marker, Popup, useMapEvents } from 'react-leaflet';
+import { MapContainer, ImageOverlay, Marker, Popup, useMapEvents, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 
@@ -28,6 +28,22 @@ const LocationSelector = ({ onClick, isSelectionMode }) => {
   return null;
 };
 
+// Component to handle centering the map on a specific location
+const MapCenterController = ({ centerLocation }) => {
+  const map = useMap();
+
+  useEffect(() => {
+    if (centerLocation) {
+      // Fly to the location with a nice animation
+      map.flyTo([centerLocation.y, centerLocation.x], 1, {
+        duration: 1.5
+      });
+    }
+  }, [centerLocation, map]);
+
+  return null;
+};
+
 const MapComponent = ({ 
   mapImage, 
   imageWidth = 1000, 
@@ -35,6 +51,7 @@ const MapComponent = ({
   markers = [], 
   onMapClick,
   isSelectionMode = false,
+  centerLocation = null,
   className = 'h-full w-full'
 }) => {
   const [mapKey, setMapKey] = useState(0);
@@ -71,6 +88,8 @@ const MapComponent = ({
         onClick={onMapClick} 
         isSelectionMode={isSelectionMode}
       />
+
+      <MapCenterController centerLocation={centerLocation} />
 
       {markers.map((marker, index) => (
         <Marker 
