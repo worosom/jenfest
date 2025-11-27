@@ -5,7 +5,7 @@ import { collection, addDoc, serverTimestamp, doc, updateDoc } from 'firebase/fi
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, storage } from '../config/firebase';
 import { useAuth } from '../hooks/useAuth';
-import MapComponent from './Map/MapComponent';
+import GoogleMapComponent from './Map/GoogleMapComponent';
 
 const PostFormModal = ({ isOpen, onClose, post = null }) => {
   const { user } = useAuth();
@@ -14,6 +14,7 @@ const PostFormModal = ({ isOpen, onClose, post = null }) => {
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [isActivity, setIsActivity] = useState(false);
+  const [published, setPublished] = useState(true);
   const [scheduledDate, setScheduledDate] = useState('');
   const [scheduledTime, setScheduledTime] = useState('');
   const [selectedImages, setSelectedImages] = useState([]);
@@ -29,7 +30,18 @@ const PostFormModal = ({ isOpen, onClose, post = null }) => {
         setTitle(post.title || '');
         setContent(post.content || '');
         setIsActivity(post.isActivity || false);
-        setMapLocation(post.mapLocation || null);
+        setPublished(post.published !== false); // Default to true if not set
+        
+        // Validate mapLocation - skip if it's legacy x/y coordinates
+        const mapLoc = post.mapLocation;
+        if (mapLoc?.lat && mapLoc?.lng) {
+          // Check if it's a valid GPS coordinate (not legacy x/y)
+          const isValid = mapLoc.lat >= 29 && mapLoc.lat <= 31 && 
+                         mapLoc.lng >= -98 && mapLoc.lng <= -96;
+          setMapLocation(isValid ? mapLoc : null);
+        } else {
+          setMapLocation(null);
+        }
 
         // Set scheduled date/time if exists
         if (post.scheduledAt) {
@@ -47,6 +59,7 @@ const PostFormModal = ({ isOpen, onClose, post = null }) => {
         setTitle('');
         setContent('');
         setIsActivity(false);
+        setPublished(true);
         setScheduledDate('');
         setScheduledTime('');
         setSelectedImages([]);
@@ -126,6 +139,7 @@ const PostFormModal = ({ isOpen, onClose, post = null }) => {
           content: content.trim(),
           mapLocation: mapLocation,
           isActivity,
+          published: published,
         };
 
         // Update scheduled date if activity
@@ -164,6 +178,7 @@ const PostFormModal = ({ isOpen, onClose, post = null }) => {
           scheduledAt: null,
           attendees: [],
           createdAt: serverTimestamp(),
+          published: published,
         };
 
         // Add scheduled date if activity
@@ -180,6 +195,7 @@ const PostFormModal = ({ isOpen, onClose, post = null }) => {
       setTitle('');
       setContent('');
       setIsActivity(false);
+      setPublished(true);
       setScheduledDate('');
       setScheduledTime('');
       setSelectedImages([]);
@@ -266,6 +282,24 @@ const PostFormModal = ({ isOpen, onClose, post = null }) => {
               <Calendar size={16} />
               Schedule as Activity
             </label>
+          </div>
+
+          {/* Published Toggle */}
+          <div className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              id="published"
+              checked={published}
+              onChange={(e) => setPublished(e.target.checked)}
+              className="w-4 h-4 text-[var(--color-clay)] focus:ring-[var(--color-clay)] border-[var(--color-warm-gray-300)] rounded"
+              disabled={uploading}
+            />
+            <label htmlFor="published" className="text-sm font-medium text-[var(--color-text-primary)]">
+              Publish this post
+            </label>
+            <span className="text-xs text-[var(--color-text-light)]">
+              (Uncheck to hide from feed)
+            </span>
           </div>
 
           {/* Date/Time for Activities */}
@@ -365,7 +399,7 @@ const PostFormModal = ({ isOpen, onClose, post = null }) => {
                 <div className="flex items-center gap-2">
                   <MapPin size={20} className="text-[var(--color-clay)]" />
                   <span className="text-sm text-[var(--color-text-secondary)]">
-                    Location tagged at X: {Math.round(mapLocation.x)}, Y: {Math.round(mapLocation.y)}
+                    Location tagged at Lat: {mapLocation.lat?.toFixed(6)}, Lng: {mapLocation.lng?.toFixed(6)}
                   </span>
                 </div>
                 <div className="flex gap-2">
@@ -402,18 +436,18 @@ const PostFormModal = ({ isOpen, onClose, post = null }) => {
 
           {isSelectingLocation && (
             <div className="border-2 border-[var(--color-leather)] rounded-lg overflow-hidden">
-              <MapComponent
-                mapImage="/map.jpg"
-                imageWidth={1348}
-                imageHeight={1102}
-                markers={mapLocation ? [{
+              <GoogleMapComponent
+                markers={mapLocation?.lat && mapLocation?.lng ? [{
                   id: 'selected',
-                  x: mapLocation.x,
-                  y: mapLocation.y,
-                  popup: <div>Tagged location</div>
+                  x: mapLocation.lng,
+                  y: mapLocation.lat,
+                  label: '★',
+                  color: '#d97746',
+                  popup: <div className="font-semibold">Tagged location</div>
                 }] : []}
                 onMapClick={(coords) => setMapLocation(coords)}
                 isSelectionMode={true}
+                centerLocation={mapLocation?.lat && mapLocation?.lng ? mapLocation : null}
                 className="h-96"
               />
             </div>

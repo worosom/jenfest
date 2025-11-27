@@ -1,17 +1,17 @@
 import { useState, useRef, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { doc, updateDoc, collection, query, where, orderBy, onSnapshot, deleteDoc, getDocs } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL, listAll, deleteObject } from 'firebase/storage';
 import { db, storage } from '../config/firebase';
 import { useAuth } from '../hooks/useAuth';
 import { useRSVP } from '../hooks/useRSVP';
-import { MapPin, Save, Camera, Loader2, FileText, AlertTriangle, Trash2 } from 'lucide-react';
-import MapComponent from '../components/Map/MapComponent';
+import { MapPin, Save, Camera, Loader2, FileText, AlertTriangle, Trash2, Calendar } from 'lucide-react';
+import GoogleMapComponent from '../components/Map/GoogleMapComponent';
 import ProfilePicture from '../components/ProfilePicture';
 import Post from '../components/Post';
-import PostFormModal from '../components/PostFormModal';
-import AttendeesModal from '../components/AttendeesModal';
 
 const Profile = ({ onNavigateToMap }) => {
+  const navigate = useNavigate();
   const { user, userProfile, signOut } = useAuth();
   const { toggleRSVP } = useRSVP();
   const [isEditingLocation, setIsEditingLocation] = useState(false);
@@ -23,10 +23,10 @@ const Profile = ({ onNavigateToMap }) => {
   const [photoURL, setPhotoURL] = useState('');
   const [userPosts, setUserPosts] = useState([]);
   const [loadingPosts, setLoadingPosts] = useState(true);
-  const [editingPost, setEditingPost] = useState(null);
-  const [selectedActivity, setSelectedActivity] = useState(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [rsvpActivities, setRsvpActivities] = useState([]);
+  const [loadingActivities, setLoadingActivities] = useState(true);
   const fileInputRef = useRef(null);
 
   // Update state when userProfile loads
@@ -34,7 +34,18 @@ const Profile = ({ onNavigateToMap }) => {
     if (userProfile) {
       setDisplayName(userProfile.displayName || '');
       setBio(userProfile.bio || '');
-      setSelectedLocation(userProfile.campLocation);
+      
+      // Validate campLocation - skip if it's legacy x/y coordinates
+      const campLoc = userProfile.campLocation;
+      if (campLoc?.lat && campLoc?.lng) {
+        // Check if it's a valid GPS coordinate (not legacy x/y)
+        const isValid = campLoc.lat >= 29 && campLoc.lat <= 31 && 
+                       campLoc.lng >= -98 && campLoc.lng <= -96;
+        setSelectedLocation(isValid ? campLoc : null);
+      } else {
+        setSelectedLocation(null);
+      }
+      
       setPhotoURL(userProfile.photoURL || '');
     }
   }, [userProfile]);
@@ -50,12 +61,37 @@ const Profile = ({ onNavigateToMap }) => {
     );
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const postsData = snapshot.docs.map(doc => ({
+      const postsData = snapshot.docs
+        .map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+      // Don't filter - show all posts (published and unpublished) on own profile
+      setUserPosts(postsData);
+      setLoadingPosts(false);
+    });
+
+    return unsubscribe;
+  }, [user]);
+
+  // Load activities user has RSVP'd to
+  useEffect(() => {
+    if (!user) return;
+
+    const q = query(
+      collection(db, 'posts'),
+      where('isActivity', '==', true),
+      where('attendees', 'array-contains', user.uid),
+      orderBy('scheduledAt', 'asc')
+    );
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const activitiesData = snapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
       }));
-      setUserPosts(postsData);
-      setLoadingPosts(false);
+      setRsvpActivities(activitiesData);
+      setLoadingActivities(false);
     });
 
     return unsubscribe;
@@ -287,15 +323,23 @@ const Profile = ({ onNavigateToMap }) => {
                 <div className="flex items-center gap-2">
                   <MapPin size={20} className="text-[var(--color-clay)]" />
                   <span className="text-sm text-[var(--color-text-secondary)]">
-                    X: {Math.round(selectedLocation.x)}, Y: {Math.round(selectedLocation.y)}
+                    Location set
                   </span>
                 </div>
-                <button
-                  onClick={() => setIsEditingLocation(!isEditingLocation)}
-                  className="text-sm text-[var(--color-clay)] hover:text-[var(--color-clay-dark)] font-medium"
-                >
-                  {isEditingLocation ? 'Close Map' : 'Change'}
-                </button>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setIsEditingLocation(!isEditingLocation)}
+                    className="text-sm text-[var(--color-clay)] hover:text-[var(--color-clay-dark)] font-medium"
+                  >
+                    {isEditingLocation ? 'Close Map' : 'Change'}
+                  </button>
+                  <button
+                    onClick={() => setSelectedLocation(null)}
+                    className="text-sm text-[var(--color-sunset-red)] hover:text-[var(--color-clay-dark)] font-medium"
+                  >
+                    Remove
+                  </button>
+                </div>
               </div>
             ) : (
               <button
@@ -309,18 +353,18 @@ const Profile = ({ onNavigateToMap }) => {
 
           {isEditingLocation && (
             <div className="border-2 border-[var(--color-leather)] rounded-lg overflow-hidden">
-              <MapComponent
-                mapImage="/map.jpg"
-                imageWidth={1348}
-                imageHeight={1102}
-                markers={selectedLocation ? [{
+              <GoogleMapComponent
+                markers={selectedLocation?.lat && selectedLocation?.lng ? [{
                   id: 'selected',
-                  x: selectedLocation.x,
-                  y: selectedLocation.y,
-                  popup: <div>Your camp</div>
+                  x: selectedLocation.lng,
+                  y: selectedLocation.lat,
+                  label: '★',
+                  color: '#4CAF50',
+                  popup: <div className="font-semibold">Your camp location</div>
                 }] : []}
                 onMapClick={handleMapClick}
                 isSelectionMode={true}
+                centerLocation={selectedLocation?.lat && selectedLocation?.lng ? selectedLocation : null}
                 className="h-96"
               />
             </div>
@@ -394,6 +438,40 @@ const Profile = ({ onNavigateToMap }) => {
         </div>
       </div>
 
+      {/* RSVP'd Activities Section */}
+      <div className="bg-[var(--color-sand-light)] border border-[var(--color-warm-gray-300)] rounded-lg shadow-lg p-6 mb-6">
+        <h2 className="text-xl font-bold text-[var(--color-text-primary)] mb-4 flex items-center gap-2">
+          <Calendar size={20} />
+          My Activities
+        </h2>
+
+        {loadingActivities ? (
+          <div className="text-center py-8 text-[var(--color-text-light)]">Loading activities...</div>
+        ) : rsvpActivities.length === 0 ? (
+          <div className="text-center py-8">
+            <Calendar size={48} className="mx-auto text-[var(--color-warm-gray-300)] mb-3" />
+            <p className="text-[var(--color-text-light)]">You haven't RSVP'd to any activities yet</p>
+            <p className="text-sm text-[var(--color-text-light)] mt-1">Browse the map to find activities!</p>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {rsvpActivities.map(activity => (
+              <Post
+                key={activity.id}
+                post={activity}
+                currentUserId={user?.uid}
+                author={activity.authorId === user?.uid ? userProfile : null}
+                onNavigateToMap={onNavigateToMap}
+                onToggleRSVP={toggleRSVP}
+                showEditDelete={false}
+                compact={true}
+                onClick={() => navigate(`/post/${activity.id}`)}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+
       {/* User's Posts Section */}
       <div className="bg-[var(--color-sand-light)] border border-[var(--color-warm-gray-300)] rounded-lg shadow-lg p-6">
         <h2 className="text-xl font-bold text-[var(--color-text-primary)] mb-4 flex items-center gap-2">
@@ -410,39 +488,61 @@ const Profile = ({ onNavigateToMap }) => {
             <p className="text-sm text-[var(--color-text-light)] mt-1">Share your festival moments!</p>
           </div>
         ) : (
-          <div className="space-y-4">
-            {userPosts.map(post => (
-              <Post
-                key={post.id}
-                post={post}
-                currentUserId={user?.uid}
-                author={userProfile}
-                onNavigateToMap={onNavigateToMap}
-                onEdit={setEditingPost}
-                onDelete={deletePost}
-                onToggleRSVP={toggleRSVP}
-                onViewAttendees={setSelectedActivity}
-                showEditDelete={true}
-              />
-            ))}
-          </div>
+          <>
+            {/* Published Posts */}
+            {userPosts.filter(post => post.published !== false).length > 0 && (
+              <div className="space-y-4 mb-6">
+                <h3 className="text-lg font-semibold text-[var(--color-text-primary)]">Published</h3>
+                {userPosts.filter(post => post.published !== false).map(post => (
+                  <Post
+                    key={post.id}
+                    post={post}
+                    currentUserId={user?.uid}
+                    author={userProfile}
+                    onNavigateToMap={onNavigateToMap}
+                    onDelete={deletePost}
+                    onToggleRSVP={toggleRSVP}
+                    showEditDelete={true}
+                    compact={false}
+                  />
+                ))}
+              </div>
+            )}
+
+            {/* Unpublished Posts (Drafts) */}
+            {userPosts.filter(post => post.published === false).length > 0 && (
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold text-[var(--color-text-secondary)] flex items-center gap-2">
+                  Unpublished Drafts
+                  <span className="text-xs font-normal text-[var(--color-text-light)]">
+                    (Only visible to you)
+                  </span>
+                </h3>
+                <div className="space-y-4">
+                  {userPosts.filter(post => post.published === false).map(post => (
+                    <div key={post.id} className="relative">
+                      <div className="absolute top-2 right-2 bg-yellow-100 text-yellow-800 text-xs font-semibold px-2 py-1 rounded z-10">
+                        Draft
+                      </div>
+                      <Post
+                        post={post}
+                        currentUserId={user?.uid}
+                        author={userProfile}
+                        onNavigateToMap={onNavigateToMap}
+                        onDelete={deletePost}
+                        onToggleRSVP={toggleRSVP}
+                        showEditDelete={true}
+                        compact={false}
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </>
         )}
       </div>
 
-      {/* Attendees Modal */}
-      <AttendeesModal
-        isOpen={!!selectedActivity}
-        onClose={() => setSelectedActivity(null)}
-        attendees={selectedActivity?.attendees || []}
-        activityTitle={selectedActivity?.title || selectedActivity?.content}
-      />
-
-      {/* Edit Post Modal */}
-      <PostFormModal
-        isOpen={!!editingPost}
-        onClose={() => setEditingPost(null)}
-        post={editingPost}
-      />
     </div>
   );
 };

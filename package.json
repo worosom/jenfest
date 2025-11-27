@@ -12,6 +12,7 @@
   "dependencies": {
     "@auth0/auth0-react": "^2.9.0",
     "@netlify/vite-plugin": "^2.7.14",
+    "@react-google-maps/api": "^2.20.7",
     "date-fns": "^4.1.0",
     "firebase": "^12.6.0",
     "firebase-admin": "^13.6.0",

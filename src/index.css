@@ -6,7 +6,7 @@
   --color-sunset-orange: #d97746;
   --color-sunset-red: #c14a3a;
   --color-sunset-pink: #e8826f;
-  
+
   /* Earth Tones - Clay, Dirt, Sand */
   --color-clay-dark: #8b4513;
   --color-clay: #a0522d;
@@ -14,22 +14,22 @@
   --color-dirt: #6b5444;
   --color-sand: #d4b896;
   --color-sand-light: #e8d5bb;
-  
+
   /* Leather Tones */
   --color-leather-dark: #3d2817;
   --color-leather: #5c3d2e;
   --color-leather-light: #7d5a46;
-  
+
   /* Greens - Dark Grassy Texas Green */
   --color-grass-dark: #3a4a2e;
   --color-grass: #4d5e3f;
   --color-grass-light: #6b7c5d;
-  
+
   /* Water - Little Lakes */
   --color-lake-dark: #2d4654;
   --color-lake: #3d5c6e;
   --color-lake-light: #5d7c8e;
-  
+
   /* Neutrals */
   --color-stone-dark: #2a2520;
   --color-stone: #3d3530;
@@ -42,20 +42,20 @@
   --color-warm-gray-700: #5c534a;
   --color-warm-gray-800: #3d3530;
   --color-warm-gray-900: #2a2520;
-  
+
   /* Semantic Color Mappings */
   --color-primary: var(--color-clay);
   --color-primary-dark: var(--color-clay-dark);
   --color-primary-light: var(--color-clay-light);
-  
+
   --color-accent: var(--color-sunset-orange);
   --color-accent-dark: var(--color-sunset-red);
   --color-accent-light: var(--color-sunset-pink);
-  
+
   --color-bg-primary: var(--color-warm-gray-100);
   --color-bg-secondary: var(--color-sand-light);
   --color-bg-dark: var(--color-stone-dark);
-  
+
   --color-text-primary: var(--color-stone-dark);
   --color-text-secondary: var(--color-leather);
   --color-text-light: var(--color-warm-gray-600);
@@ -73,7 +73,31 @@ body {
   margin: 0;
   min-width: 320px;
   min-height: 100dvh;
+  max-height: 100dvh;
+  height: 100dvh;
   background-color: var(--color-bg-primary);
+  overflow: hidden;
+  position: fixed;
+  width: 100%;
+  /* Prevent pull-to-refresh and overscroll bounce */
+  overscroll-behavior: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Prevent body scroll on mobile */
+html {
+  overflow: hidden;
+  height: 100dvh;
+  position: fixed;
+  width: 100%;
+  overscroll-behavior: none;
+}
+
+/* Fix for iOS Safari address bar */
+#root {
+  height: 100dvh;
+  overflow: hidden;
+  position: relative;
 }
 
 /* Fix Leaflet map z-index to not block modals and FAB */
@@ -103,4 +127,46 @@ body {
 /* Override Leaflet popup paragraph margins for better layout */
 .leaflet-popup-content p {
   margin: 0 !important;
+}
+
+/* Google Maps InfoWindow Styling */
+.gm-style .gm-style-iw-c {
+  background-color: var(--color-sand-light) !important;
+  border-radius: 8px !important;
+  padding: 12px !important;
+  box-shadow:
+    0 4px 6px -1px rgba(0, 0, 0, 0.3),
+    0 2px 4px -2px rgba(0, 0, 0, 0.2) !important;
+}
+
+.gm-style .gm-style-iw-d {
+  overflow: auto !important;
+  max-height: 400px !important;
+}
+
+.gm-style .gm-style-iw-t::after {
+  background: var(--color-sand-light) !important;
+  box-shadow: -2px 2px 2px 0 rgba(0, 0, 0, 0.2) !important;
+}
+
+/* Hide close button - click map to close popup instead */
+.gm-style .gm-ui-hover-effect,
+.gm-style-iw-ch {
+  display: none !important;
+}
+
+/* Prevent scroll on fixed header/footer on mobile */
+header,
+nav {
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* Allow touch on interactive elements within header/footer */
+header button,
+header a,
+nav button,
+nav a {
+  touch-action: manipulation;
 }

@@ -10,12 +10,14 @@ const ProfilePicture = ({
   const [imageError, setImageError] = useState(false);
 
   const sizeClasses = {
+    xs: 'w-5 h-5',
     sm: 'w-8 h-8',
     md: 'w-10 h-10',
     lg: 'w-20 h-20',
   };
 
   const iconSizes = {
+    xs: 12,
     sm: 16,
     md: 20,
     lg: 40,

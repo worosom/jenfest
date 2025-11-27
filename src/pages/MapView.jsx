@@ -1,24 +1,31 @@
 import { useState, useEffect } from "react";
-import { useLocation } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { collection, query, onSnapshot } from "firebase/firestore";
 import { db } from "../config/firebase";
+import { useAuth } from "../hooks/useAuth";
 import { useUsers } from "../hooks/useUsers";
-import MapComponent from "../components/Map/MapComponent";
+import GoogleMapComponent from "../components/Map/GoogleMapComponent";
 import ProfilePicture from "../components/ProfilePicture";
-import createCustomIcon from "../components/Map/CustomMarker";
 
 const MapView = ({ onViewUserProfile }) => {
   const location = useLocation();
+  const navigate = useNavigate();
+  const { user } = useAuth();
   const { users } = useUsers();
-  const [markers, setMarkers] = useState([]);
+  const [markers, setMarkers] = useState(undefined); // Start as undefined to distinguish from empty
   const [selectedCoords, setSelectedCoords] = useState(null);
   const [allUsers, setAllUsers] = useState([]);
   const [allPosts, setAllPosts] = useState([]);
 
-  // Festival map configuration
-  const mapImage = "/map.jpg";
-  const imageWidth = 1348;
-  const imageHeight = 1102;
+  // Validate if coordinates are real GPS coordinates (not legacy imaginary map coords)
+  const isValidGPSCoordinate = (mapLocation) => {
+    if (!mapLocation?.lat || !mapLocation?.lng) return false;
+    // Check if coordinates are within reasonable range for Texas
+    // Festival is around lat: 30.14, lng: -97.01
+    const lat = mapLocation.lat;
+    const lng = mapLocation.lng;
+    return lat >= 29 && lat <= 31 && lng >= -98 && lng <= -96;
+  };
 
   // Listen to users for camp locations
   useEffect(() => {
@@ -37,10 +44,15 @@ const MapView = ({ onViewUserProfile }) => {
   useEffect(() => {
     const postsQuery = query(collection(db, "posts"));
     const unsubscribe = onSnapshot(postsQuery, (snapshot) => {
-      const postsArray = snapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      }));
+      const postsArray = snapshot.docs
+        .map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        }))
+        .filter((post) => {
+          // Only show published posts
+          return post.published !== false; // Default to true if not set
+        });
       setAllPosts(postsArray);
     });
     return unsubscribe;
@@ -50,9 +62,17 @@ const MapView = ({ onViewUserProfile }) => {
   useEffect(() => {
     const newMarkers = [];
 
-    // User camp markers
+    // User camp markers (only valid GPS coordinates)
     allUsers.forEach((userData) => {
-      if (userData.campLocation) {
+      // Skip invalid/legacy coordinates
+      if (
+        userData.campLocation &&
+        !isValidGPSCoordinate(userData.campLocation)
+      ) {
+        return;
+      }
+
+      if (userData.campLocation?.lat && userData.campLocation?.lng) {
         const userInfo = users[userData.uid];
         const truncatedBio =
           userInfo?.bio && userInfo.bio.length > 120
@@ -60,81 +80,95 @@ const MapView = ({ onViewUserProfile }) => {
             : userInfo?.bio;
 
         newMarkers.push({
-          id: `user-${userData.id}-${userInfo?.photoURL}`,
+          id: `user-${userData.id}`,
           type: "user",
-          x: userData.campLocation.x,
-          y: userData.campLocation.y,
-          icon: createCustomIcon("user"),
+          userId: userData.uid,
+          x: userData.campLocation.lng,
+          y: userData.campLocation.lat,
+          icon: {
+            url:
+              "data:image/svg+xml;charset=UTF-8," +
+              encodeURIComponent(`
+              <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24">
+                <circle cx="12" cy="12" r="10" fill="#4CAF50" stroke="white" stroke-width="2"/>
+                <path d="M12 12c-1.657 0-3-1.343-3-3s1.343-3 3-3 3 1.343 3 3-1.343 3-3 3z M12 14c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" fill="white"/>
+              </svg>
+            `),
+            scaledSize: { width: 32, height: 32 },
+            anchor: { x: 16, y: 16 },
+          },
           popup: (
             <div className="min-w-[200px]">
-              <button
-                onClick={() => onViewUserProfile?.(userData.uid)}
-                className="w-full hover:opacity-80 transition-opacity"
-              >
-                <div className="flex items-center gap-3 mb-2">
-                  <ProfilePicture
-                    src={userInfo?.photoURL}
-                    alt={userInfo?.displayName || "User"}
-                    size="md"
-                  />
-                  <p className="font-semibold hover:text-purple-600 transition-colors text-left">
-                    {userInfo?.displayName || "Anonymous"}
-                  </p>
-                </div>
-                {truncatedBio && (
-                  <p className="text-sm text-gray-600 text-left mt-2">
-                    {truncatedBio}
-                  </p>
-                )}
-              </button>
+              <div className="flex items-center gap-3 mb-2">
+                <ProfilePicture
+                  src={userInfo?.photoURL}
+                  alt={userInfo?.displayName || "User"}
+                  size="md"
+                />
+                <p className="font-semibold text-left">
+                  {userInfo?.displayName || "Anonymous"}
+                </p>
+              </div>
+              {truncatedBio && (
+                <p className="text-sm text-gray-600 text-left mt-2">
+                  {truncatedBio}
+                </p>
+              )}
             </div>
           ),
         });
       }
     });
 
-    // Post location markers
+    // Post location markers (only valid GPS coordinates)
     allPosts.forEach((post) => {
-      if (post.mapLocation) {
+      if (post.mapLocation && !isValidGPSCoordinate(post.mapLocation)) {
+        return;
+      }
+
+      if (post.mapLocation?.lat && post.mapLocation?.lng) {
         const authorInfo = users[post.authorId];
-        const markerType = post.isActivity ? "activity" : "post";
+        const isActivity = post.isActivity;
+
         newMarkers.push({
-          id: `post-${post.id}-${authorInfo?.photoURL}`,
-          type: markerType,
-          x: post.mapLocation.x,
-          y: post.mapLocation.y,
-          icon: createCustomIcon(markerType),
+          id: `post-${post.id}`,
+          type: isActivity ? "activity" : "post",
+          postId: post.id,
+          postData: post,
+          x: post.mapLocation.lng,
+          y: post.mapLocation.lat,
+          icon: {
+            url:
+              "data:image/svg+xml;charset=UTF-8," +
+              encodeURIComponent(`
+              <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24">
+                <circle cx="12" cy="12" r="10" fill="${isActivity ? "#d97746" : "#a0522d"}" stroke="white" stroke-width="2"/>
+                <path d="M12 2L9.19 8.63L2 9.24l5.46 4.73L5.82 21L12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2z" fill="white"/>
+              </svg>
+            `),
+            scaledSize: { width: 32, height: 32 },
+            anchor: { x: 16, y: 16 },
+          },
           popup: (
             <div className="min-w-[250px] max-w-xs">
-              {/* Header with timestamp */}
-              <div className="flex items-center justify-between gap-2 mb-2 pb-2 border-b">
-                {post.isActivity ? (
-                  <span className="text-xs text-purple-600 font-medium flex-shrink-0">
+              {/* Header with Activity badge */}
+              {post.isActivity && (
+                <div className="flex items-center gap-2 mb-2 pb-2 border-b">
+                  <span className="text-xs text-[var(--color-clay)] font-medium flex-shrink-0">
                     Activity
                   </span>
-                ) : (
-                  <div></div>
-                )}
-                <p className="text-xs text-gray-400 flex-shrink-0">
-                  {post.createdAt?.toDate().toLocaleDateString("en-US", {
-                    month: "short",
-                    day: "numeric",
-                    hour: "numeric",
-                    minute: "2-digit",
-                  })}
-                </p>
-              </div>
-
-              {post.isActivity && post.scheduledAt && (
-                <p className="text-xs text-gray-600 mb-2">
-                  {post.scheduledAt.toDate().toLocaleDateString("en-US", {
-                    weekday: "short",
-                    month: "short",
-                    day: "numeric",
-                    hour: "numeric",
-                    minute: "2-digit",
-                  })}
-                </p>
+                  {post.scheduledAt && (
+                    <p className="text-xs text-gray-600 flex-shrink-0">
+                      {post.scheduledAt.toDate().toLocaleDateString("en-US", {
+                        weekday: "short",
+                        month: "short",
+                        day: "numeric",
+                        hour: "numeric",
+                        minute: "2-digit",
+                      })}
+                    </p>
+                  )}
+                </div>
               )}
 
               {post.title && (
@@ -170,19 +204,27 @@ const MapView = ({ onViewUserProfile }) => {
     console.log("Clicked coordinates:", coords);
   };
 
-  // Get center location from navigation state (if navigating from a post)
+  const handleMarkerClick = (marker) => {
+    if (marker.type === "user" && marker.userId) {
+      navigate(`/user/${marker.userId}`);
+    } else if ((marker.type === "post" || marker.type === "activity") && marker.postId) {
+      navigate(`/post/${marker.postId}`);
+    }
+  };
+
+  // Get center location and highlight marker ID from navigation state
   const centerLocation = location.state?.centerLocation;
+  const highlightMarkerId = location.state?.highlightMarkerId;
 
   return (
     <div className="h-full w-full relative">
-      <MapComponent
-        mapImage={mapImage}
-        imageWidth={imageWidth}
-        imageHeight={imageHeight}
+      <GoogleMapComponent
         markers={markers}
         onMapClick={handleMapClick}
+        onMarkerClick={handleMarkerClick}
         isSelectionMode={false}
         centerLocation={centerLocation}
+        highlightMarkerId={highlightMarkerId}
         className="h-[calc(100dvh-8rem)]"
       />
 
@@ -190,7 +232,8 @@ const MapView = ({ onViewUserProfile }) => {
         <div className="absolute top-4 right-4 bg-white p-3 rounded-lg shadow-lg">
           <p className="text-sm font-semibold mb-1">Selected Location:</p>
           <p className="text-xs text-gray-600">
-            X: {Math.round(selectedCoords.x)}, Y: {Math.round(selectedCoords.y)}
+            Lat: {selectedCoords.lat.toFixed(6)}, Lng:{" "}
+            {selectedCoords.lng.toFixed(6)}
           </p>
         </div>
       )}
@@ -199,4 +242,3 @@ const MapView = ({ onViewUserProfile }) => {
 };
 
 export default MapView;
-

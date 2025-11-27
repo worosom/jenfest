@@ -13,8 +13,8 @@ import { useAuth } from "../hooks/useAuth";
 import { useUsers } from "../hooks/useUsers";
 import { useRSVP } from "../hooks/useRSVP";
 import Post from "../components/Post";
-import AttendeesModal from "../components/AttendeesModal";
-import PostFormModal from "../components/PostFormModal";
+import GamePost from "../components/GamePost";
+import { gamesData } from "../utils/gamesData";
 
 const Feed = ({ onViewUserProfile, onNavigateToMap }) => {
   const { user } = useAuth();
@@ -22,18 +22,26 @@ const Feed = ({ onViewUserProfile, onNavigateToMap }) => {
   const { toggleRSVP } = useRSVP();
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [selectedActivity, setSelectedActivity] = useState(null);
-  const [editingPost, setEditingPost] = useState(null);
+  const [activeFilter, setActiveFilter] = useState("all");
 
   useEffect(() => {
     const q = query(collection(db, "posts"), orderBy("createdAt", "desc"));
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const postsData = snapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      }));
-      setPosts(postsData);
+      const postsData = snapshot.docs
+        .map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        }))
+        .filter((post) => {
+          // Only show published posts
+          return post.published !== false; // Default to true if not set
+        });
+
+      // Combine regular posts with hardcoded games
+      const allPosts = [...gamesData, ...postsData];
+
+      setPosts(allPosts);
       setLoading(false);
     });
 
@@ -63,6 +71,16 @@ const Feed = ({ onViewUserProfile, onNavigateToMap }) => {
     }
   };
 
+  // Filter posts based on active filter
+  const filteredPosts = posts.filter((post) => {
+    if (activeFilter === "all") return true;
+    if (activeFilter === "posts")
+      return !post.isActivity && post.postType !== "game";
+    if (activeFilter === "activities") return post.isActivity;
+    if (activeFilter === "games") return post.postType === "game";
+    return true;
+  });
+
   if (posts.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center h-full py-20 px-4">
@@ -78,42 +96,106 @@ const Feed = ({ onViewUserProfile, onNavigateToMap }) => {
   }
 
   return (
-    <>
-      <div className="max-w-2xl mx-auto px-4 py-6 space-y-4">
-        {posts.map((post) => (
-          <Post
-            key={post.id}
-            post={post}
-            currentUserId={user?.uid}
-            author={users[post.authorId]}
-            onViewUserProfile={onViewUserProfile}
-            onNavigateToMap={onNavigateToMap}
-            onEdit={setEditingPost}
-            onDelete={deletePost}
-            onToggleRSVP={toggleRSVP}
-            onViewAttendees={setSelectedActivity}
-            showEditDelete={true}
+    <div className="max-w-2xl mx-auto px-4 pb-12 pt-4 space-y-4">
+      {/* Filter Tabs */}
+      <div className="bg-[var(--color-sand-light)] border border-[var(--color-warm-gray-300)] rounded-lg shadow-lg p-2 sticky top-0 z-10">
+        <div className="flex gap-2">
+          <FilterTab
+            label="All"
+            active={activeFilter === "all"}
+            onClick={() => setActiveFilter("all")}
+            count={posts.length}
           />
-        ))}
+          <FilterTab
+            label="Posts"
+            active={activeFilter === "posts"}
+            onClick={() => setActiveFilter("posts")}
+            count={
+              posts.filter((p) => !p.isActivity && p.postType !== "game").length
+            }
+          />
+          <FilterTab
+            label="Activities"
+            active={activeFilter === "activities"}
+            onClick={() => setActiveFilter("activities")}
+            count={posts.filter((p) => p.isActivity).length}
+          />
+          <FilterTab
+            label="Games"
+            active={activeFilter === "games"}
+            onClick={() => setActiveFilter("games")}
+            count={posts.filter((p) => p.postType === "game").length}
+          />
+        </div>
       </div>
 
-      {/* Attendees Modal */}
-      <AttendeesModal
-        isOpen={!!selectedActivity}
-        onClose={() => setSelectedActivity(null)}
-        attendees={selectedActivity?.attendees || []}
-        activityTitle={selectedActivity?.content}
-        onViewUserProfile={onViewUserProfile}
-      />
+      {/* Posts List */}
+      {filteredPosts.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-12 px-4">
+          <MessageSquare
+            size={48}
+            className="text-[var(--color-warm-gray-300)] mb-4"
+          />
+          <p className="text-[var(--color-text-light)] text-center">
+            No {activeFilter === "all" ? "posts" : activeFilter} yet.
+          </p>
+        </div>
+      ) : (
+        filteredPosts.map((post) => {
+          // Render GamePost for games, regular Post for everything else
+          if (post.postType === "game") {
+            return (
+              <GamePost
+                key={post.id}
+                post={post}
+                currentUserId={user?.uid}
+                author={users[post.authorId]}
+                onViewUserProfile={onViewUserProfile}
+              />
+            );
+          }
 
-      {/* Edit Post Modal */}
-      <PostFormModal
-        isOpen={!!editingPost}
-        onClose={() => setEditingPost(null)}
-        post={editingPost}
-      />
-    </>
+          return (
+            <Post
+              key={post.id}
+              post={post}
+              currentUserId={user?.uid}
+              author={users[post.authorId]}
+              onViewUserProfile={onViewUserProfile}
+              onNavigateToMap={onNavigateToMap}
+              onDelete={deletePost}
+              onToggleRSVP={toggleRSVP}
+              showEditDelete={true}
+            />
+          );
+        })
+      )}
+    </div>
+  );
+};
+
+// Filter Tab Component
+const FilterTab = ({ label, active, onClick, count }) => {
+  return (
+    <button
+      onClick={onClick}
+      className={`flex-1 px-4 py-2 rounded-lg font-medium text-sm transition-all ${
+        active
+          ? "bg-[var(--color-clay)] text-white shadow-md"
+          : "bg-[var(--color-warm-gray-200)] text-[var(--color-text-secondary)] hover:bg-[var(--color-warm-gray-300)]"
+      }`}
+    >
+      {label}
+      {count > 0 && (
+        <span
+          className={`ml-1 text-xs ${active ? "opacity-90" : "opacity-60"}`}
+        >
+          ({count})
+        </span>
+      )}
+    </button>
   );
 };
 
 export default Feed;
+

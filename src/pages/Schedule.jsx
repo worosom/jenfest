@@ -1,17 +1,18 @@
 import { useEffect, useState } from 'react';
-import { collection, query, where, orderBy, onSnapshot, doc, updateDoc, arrayUnion, arrayRemove } from 'firebase/firestore';
+import { useNavigate } from 'react-router-dom';
+import { collection, query, where, orderBy, onSnapshot, doc, updateDoc, arrayUnion, arrayRemove, deleteDoc } from 'firebase/firestore';
 import { db } from '../config/firebase';
-import { Calendar as CalendarIcon, Users } from 'lucide-react';
+import { Calendar as CalendarIcon } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import { useUsers } from '../hooks/useUsers';
-import AttendeesModal from '../components/AttendeesModal';
+import Post from '../components/Post';
 
 const Schedule = ({ onViewUserProfile }) => {
+  const navigate = useNavigate();
   const { user } = useAuth();
   const { users } = useUsers();
   const [activities, setActivities] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [selectedActivity, setSelectedActivity] = useState(null);
 
   useEffect(() => {
     const q = query(
@@ -21,10 +22,15 @@ const Schedule = ({ onViewUserProfile }) => {
     );
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const activitiesData = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
+      const activitiesData = snapshot.docs
+        .map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }))
+        .filter((post) => {
+          // Only show published posts
+          return post.published !== false; // Default to true if not set
+        });
       setActivities(activitiesData);
       setLoading(false);
     });
@@ -40,19 +46,38 @@ const Schedule = ({ onViewUserProfile }) => {
     );
   }
 
-  const toggleRSVP = async (activity) => {
+  const handleToggleRSVP = async (activity) => {
     if (!user) return;
     
     try {
       const activityRef = doc(db, 'posts', activity.id);
-      if (activity.attendees.includes(user.uid)) {
-        await updateDoc(activityRef, { attendees: arrayRemove(user.uid) });
-      } else {
-        await updateDoc(activityRef, { attendees: arrayUnion(user.uid) });
-      }
+      const isAttending = activity.attendees?.includes(user.uid);
+      
+      await updateDoc(activityRef, {
+        attendees: isAttending ? arrayRemove(user.uid) : arrayUnion(user.uid)
+      });
     } catch (error) {
       console.error('Error toggling RSVP:', error);
     }
+  };
+
+  const handleDelete = async (postId) => {
+    if (window.confirm('Are you sure you want to delete this activity?')) {
+      try {
+        await deleteDoc(doc(db, 'posts', postId));
+      } catch (error) {
+        console.error('Error deleting activity:', error);
+        alert('Failed to delete activity');
+      }
+    }
+  };
+
+  const handleNavigateToMap = (location, postId) => {
+    navigate('/map', { state: { centerLocation: location, highlightMarkerId: postId ? `post-${postId}` : null } });
+  };
+
+  const handleActivityClick = (activityId) => {
+    navigate(`/post/${activityId}`);
   };
 
   if (activities.length === 0) {
@@ -81,72 +106,35 @@ const Schedule = ({ onViewUserProfile }) => {
   }, {});
 
   return (
-    <>
-      <div className="max-w-2xl mx-auto px-4 py-6">
-        {Object.entries(groupedActivities).map(([day, dayActivities]) => (
+    <div className="max-w-2xl mx-auto px-4 py-6">
+      {Object.entries(groupedActivities).map(([day, dayActivities]) => (
         <div key={day} className="mb-8">
           <h2 className="text-xl font-bold text-[var(--color-text-primary)] mb-4 sticky top-0 bg-[var(--color-bg-primary)] py-2">
             {day}
           </h2>
           <div className="space-y-3">
-            {dayActivities.map(activity => (
-              <div key={activity.id} className="bg-[var(--color-sand-light)] border border-[var(--color-warm-gray-300)] rounded-lg shadow-lg p-4">
-                <div className="flex justify-between items-start mb-2">
-                  <div className="flex-1">
-                    {activity.title ? (
-                      <>
-                        <h3 className="font-bold text-[var(--color-text-primary)] text-lg">{activity.title}</h3>
-                        <p className="text-sm text-[var(--color-text-secondary)] mt-1">{activity.content}</p>
-                      </>
-                    ) : (
-                      <h3 className="font-semibold text-[var(--color-text-primary)]">{activity.content}</h3>
-                    )}
-                  </div>
-                  <span className="text-sm text-[var(--color-sunset-orange)] font-medium ml-2 flex-shrink-0">
-                    {activity.scheduledAt?.toDate().toLocaleTimeString('en-US', {
-                      hour: 'numeric',
-                      minute: '2-digit'
-                    })}
-                  </span>
-                </div>
-                <p className="text-sm text-[var(--color-text-light)] mb-3">
-                  by {users[activity.authorId]?.displayName || 'Anonymous'}
-                </p>
-                <div className="flex items-center justify-between pt-3 border-t border-[var(--color-warm-gray-300)]">
-                  <button
-                    onClick={() => setSelectedActivity(activity)}
-                    className="flex items-center gap-1 text-sm text-[var(--color-text-secondary)] hover:text-[var(--color-clay)] transition-colors font-medium"
-                  >
-                    <Users size={16} />
-                    <span>{activity.attendees?.length || 0} attending</span>
-                  </button>
-                  <button
-                    onClick={() => toggleRSVP(activity)}
-                    className={`px-4 py-2 rounded-lg font-medium text-sm transition-colors ${
-                      activity.attendees?.includes(user?.uid)
-                        ? 'bg-[var(--color-clay-light)] text-[var(--color-leather-dark)] hover:bg-[var(--color-clay)]'
-                        : 'bg-[var(--color-warm-gray-200)] text-[var(--color-text-secondary)] hover:bg-[var(--color-warm-gray-300)]'
-                    }`}
-                  >
-                    {activity.attendees?.includes(user?.uid) ? 'Attending' : 'Join'}
-                  </button>
-                </div>
-              </div>
-            ))}
+            {dayActivities.map(activity => {
+              const author = users[activity.authorId];
+              return (
+                <Post
+                  key={activity.id}
+                  post={activity}
+                  currentUserId={user?.uid}
+                  author={author}
+                  onViewUserProfile={onViewUserProfile}
+                  onNavigateToMap={handleNavigateToMap}
+                  onDelete={handleDelete}
+                  onToggleRSVP={handleToggleRSVP}
+                  showEditDelete={true}
+                  compact={true}
+                  onClick={() => handleActivityClick(activity.id)}
+                />
+              );
+            })}
           </div>
         </div>
-        ))}
-      </div>
-
-      {/* Attendees Modal */}
-      <AttendeesModal
-        isOpen={!!selectedActivity}
-        onClose={() => setSelectedActivity(null)}
-        attendees={selectedActivity?.attendees || []}
-        activityTitle={selectedActivity?.content}
-        onViewUserProfile={onViewUserProfile}
-      />
-    </>
+      ))}
+    </div>
   );
 };
 

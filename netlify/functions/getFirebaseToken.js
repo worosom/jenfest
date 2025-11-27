@@ -31,7 +31,8 @@ export const handler = async (event) => {
     }
 
     // Verify the Auth0 token by calling Auth0's userinfo endpoint
-    const userInfoResponse = await fetch(`https://${process.env.VITE_AUTH0_DOMAIN}/userinfo`, {
+    const auth0Domain = process.env.AUTH0_DOMAIN || process.env.VITE_AUTH0_DOMAIN;
+    const userInfoResponse = await fetch(`https://${auth0Domain}/userinfo`, {
       headers: {
         Authorization: `Bearer ${auth0Token}`,
       },
@@ -56,6 +57,12 @@ export const handler = async (event) => {
     };
   } catch (error) {
     console.error('Error creating Firebase token:', error);
+    console.error('Environment check:', {
+      hasProjectId: !!process.env.FIREBASE_PROJECT_ID,
+      hasClientEmail: !!process.env.FIREBASE_CLIENT_EMAIL,
+      hasPrivateKey: !!process.env.FIREBASE_PRIVATE_KEY,
+      hasAuth0Domain: !!(process.env.AUTH0_DOMAIN || process.env.VITE_AUTH0_DOMAIN)
+    });
     return {
       statusCode: 500,
       body: JSON.stringify({ 

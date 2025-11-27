@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Routes,
   Route,
@@ -7,6 +7,7 @@ import {
   useLocation,
 } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
+import { useUnreadMessages } from "../hooks/useUnreadMessages";
 import {
   Map,
   Calendar,
@@ -16,6 +17,8 @@ import {
   Plus,
   Home as HomeIcon,
   Users,
+  MessageCircle,
+  HelpCircle,
 } from "lucide-react";
 import MapView from "./MapView";
 import Feed from "./Feed";
@@ -23,17 +26,33 @@ import Schedule from "./Schedule";
 import Profile from "./Profile";
 import UsersDirectory from "./UsersDirectory";
 import UserProfile from "./UserProfile";
+import PostDetail from "./PostDetail";
 import TermsOfService from "./TermsOfService";
 import PrivacyPolicy from "./PrivacyPolicy";
+import CookiePolicy from "./CookiePolicy";
 import PostFormModal from "../components/PostFormModal";
 import LoginModal from "../components/LoginModal";
+import DirectMessagesModal from "../components/DirectMessagesModal";
+import WelcomeModal from "../components/HelpModal";
+import AudioPlayer from "../components/AudioPlayer";
 
 const Home = () => {
   const { user, signOut } = useAuth();
+  const unreadCount = useUnreadMessages();
   const navigate = useNavigate();
   const location = useLocation();
   const [isCreatePostOpen, setIsCreatePostOpen] = useState(false);
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
+  const [isMessagesOpen, setIsMessagesOpen] = useState(false);
+  const [isWelcomeOpen, setIsWelcomeOpen] = useState(false);
+
+  // Check if this is the user's first visit
+  useEffect(() => {
+    const hasVisited = localStorage.getItem("jenfest_visited");
+    if (!hasVisited) {
+      setIsWelcomeOpen(true);
+    }
+  }, []);
 
   const handleSignOut = async () => {
     try {
@@ -70,43 +89,88 @@ const Home = () => {
 
   // Check if we're on a legal page (hide nav/footer)
   const isLegalPage =
-    location.pathname === "/terms" || location.pathname === "/privacy";
+    location.pathname === "/terms" ||
+    location.pathname === "/privacy" ||
+    location.pathname === "/cookies";
 
   return (
     <div className="h-[100dvh] bg-[var(--color-bg-primary)] flex flex-col overflow-hidden">
       {/* Header */}
       {!isLegalPage && (
         <header className="bg-[var(--color-leather-dark)] shadow-lg border-b border-[var(--color-leather)] flex-shrink-0 z-10">
-          <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
-            <Link to="/">
+          <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between gap-4">
+            <Link to="/" className="flex-shrink-0">
               <img
                 src="/jenfest_logo2.png"
                 alt="Jenfest"
                 className="h-10 object-contain cursor-pointer"
               />
             </Link>
+
+            {/* Audio Player */}
+            <AudioPlayer src="/remfest_4.0_theme_song.m4a" />
+
             {user ? (
-              <button
-                onClick={handleSignOut}
-                className="p-2 text-[var(--color-sand)] hover:text-[var(--color-sand-light)] hover:bg-[var(--color-leather)] rounded-lg transition-colors flex items-center gap-2"
-                title="Sign Out"
-              >
-                <LogOut size={20} />
-                <span className="text-sm font-medium hidden sm:inline">
-                  Sign Out
-                </span>
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setIsWelcomeOpen(true)}
+                  className="p-2 text-[var(--color-sand)] hover:text-[var(--color-sand-light)] hover:bg-[var(--color-leather)] rounded-lg transition-colors flex items-center gap-2"
+                  title="Help"
+                >
+                  <HelpCircle size={20} />
+                  <span className="text-sm font-medium hidden sm:inline">
+                    Help
+                  </span>
+                </button>
+                <button
+                  onClick={() => setIsMessagesOpen(true)}
+                  className="p-2 text-[var(--color-sand)] hover:text-[var(--color-sand-light)] hover:bg-[var(--color-leather)] rounded-lg transition-colors flex items-center gap-2 relative"
+                  title="Messages"
+                >
+                  <MessageCircle size={20} />
+                  <span className="text-sm font-medium hidden sm:inline">
+                    Messages
+                  </span>
+                  {unreadCount > 0 && (
+                    <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
+                      !
+                    </span>
+                  )}
+                </button>
+                <button
+                  onClick={handleSignOut}
+                  className="p-2 text-[var(--color-sand)] hover:text-[var(--color-sand-light)] hover:bg-[var(--color-leather)] rounded-lg transition-colors flex items-center gap-2"
+                  title="Sign Out"
+                >
+                  <LogOut size={20} />
+                  <span className="text-sm font-medium hidden sm:inline">
+                    Sign Out
+                  </span>
+                </button>
+              </div>
             ) : (
-              <button
-                onClick={() => setIsLoginModalOpen(true)}
-                className="p-2 text-[var(--color-sunset-orange)] hover:text-[var(--color-sunset-pink)] hover:bg-[var(--color-leather)] rounded-lg transition-colors flex items-center gap-2"
-                title="Sign In"
-              >
-                <LogIn size={20} />
-                <span className="text-sm font-medium hidden sm:inline">
-                  Sign In
-                </span>
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setIsWelcomeOpen(true)}
+                  className="p-2 text-[var(--color-sand)] hover:text-[var(--color-sand-light)] hover:bg-[var(--color-leather)] rounded-lg transition-colors flex items-center gap-2"
+                  title="Help"
+                >
+                  <HelpCircle size={20} />
+                  <span className="text-sm font-medium hidden sm:inline">
+                    Help
+                  </span>
+                </button>
+                <button
+                  onClick={() => setIsLoginModalOpen(true)}
+                  className="p-2 text-[var(--color-sunset-orange)] hover:text-[var(--color-sunset-pink)] hover:bg-[var(--color-leather)] rounded-lg transition-colors flex items-center gap-2"
+                  title="Sign In"
+                >
+                  <LogIn size={20} />
+                  <span className="text-sm font-medium hidden sm:inline">
+                    Sign In
+                  </span>
+                </button>
+              </div>
             )}
           </div>
         </header>
@@ -117,7 +181,19 @@ const Home = () => {
         <Routes>
           <Route
             path="/"
-            element={<Feed onViewUserProfile={handleViewUserProfile} onNavigateToMap={(location) => navigate('/map', { state: { centerLocation: location } })} />}
+            element={
+              <Feed
+                onViewUserProfile={handleViewUserProfile}
+                onNavigateToMap={(location, postId) =>
+                  navigate("/map", {
+                    state: {
+                      centerLocation: location,
+                      highlightMarkerId: postId ? `post-${postId}` : null,
+                    },
+                  })
+                }
+              />
+            }
           />
           <Route
             path="/map"
@@ -137,16 +213,38 @@ const Home = () => {
             path="/profile"
             element={
               user ? (
-                <Profile onNavigateToMap={(location) => navigate('/map', { state: { centerLocation: location } })} />
+                <Profile
+                  onNavigateToMap={(location) =>
+                    navigate("/map", { state: { centerLocation: location } })
+                  }
+                />
               ) : (
-                <Feed onViewUserProfile={handleViewUserProfile} onNavigateToMap={(location) => navigate('/map', { state: { centerLocation: location } })} />
+                <Feed
+                  onViewUserProfile={handleViewUserProfile}
+                  onNavigateToMap={(location, postId) =>
+                    navigate("/map", {
+                      state: {
+                        centerLocation: location,
+                        highlightMarkerId: postId ? `post-${postId}` : null,
+                      },
+                    })
+                  }
+                />
               )
             }
           />
           <Route
             path="/user/:userId"
-            element={<UserProfile onBack={() => navigate(-1)} onNavigateToMap={(location) => navigate('/map', { state: { centerLocation: location } })} />}
+            element={
+              <UserProfile
+                onBack={() => navigate(-1)}
+                onNavigateToMap={(location) =>
+                  navigate("/map", { state: { centerLocation: location } })
+                }
+              />
+            }
           />
+          <Route path="/post/:postId" element={<PostDetail />} />
           <Route
             path="/terms"
             element={<TermsOfService onBack={() => navigate(-1)} />}
@@ -154,6 +252,10 @@ const Home = () => {
           <Route
             path="/privacy"
             element={<PrivacyPolicy onBack={() => navigate(-1)} />}
+          />
+          <Route
+            path="/cookies"
+            element={<CookiePolicy onBack={() => navigate(-1)} />}
           />
         </Routes>
       </main>
@@ -182,6 +284,20 @@ const Home = () => {
         isOpen={isLoginModalOpen}
         onClose={() => setIsLoginModalOpen(false)}
         onSuccess={handleLoginSuccess}
+      />
+
+      {/* Direct Messages Modal */}
+      {user && (
+        <DirectMessagesModal
+          isOpen={isMessagesOpen}
+          onClose={() => setIsMessagesOpen(false)}
+        />
+      )}
+
+      {/* Welcome Modal */}
+      <WelcomeModal
+        isOpen={isWelcomeOpen}
+        onClose={() => setIsWelcomeOpen(false)}
       />
 
       {/* Bottom Navigation - Fixed */}
@@ -233,14 +349,21 @@ const Home = () => {
                 to="/terms"
                 className="hover:text-[var(--color-sand-light)] transition-colors"
               >
-                Terms of Service
+                Terms
               </Link>
               <span className="text-[var(--color-warm-gray-500)]">|</span>
               <Link
                 to="/privacy"
                 className="hover:text-[var(--color-sand-light)] transition-colors"
               >
-                Privacy Policy
+                Privacy
+              </Link>
+              <span className="text-[var(--color-warm-gray-500)]">|</span>
+              <Link
+                to="/cookies"
+                className="hover:text-[var(--color-sand-light)] transition-colors"
+              >
+                Cookies
               </Link>
             </div>
           </div>

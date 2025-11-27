@@ -1,18 +1,21 @@
-import { useEffect, useState } from 'react';
-import { MapContainer, ImageOverlay, Marker, Popup, useMapEvents, useMap } from 'react-leaflet';
-import L from 'leaflet';
-import 'leaflet/dist/leaflet.css';
+import { useEffect, useState } from "react";
+import {
+  MapContainer,
+  ImageOverlay,
+  Marker,
+  Popup,
+  useMapEvents,
+  useMap,
+} from "react-leaflet";
+import L from "leaflet";
+import "leaflet/dist/leaflet.css";
 
 // Fix for default marker icons in React
-import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png';
-import markerIcon from 'leaflet/dist/images/marker-icon.png';
-import markerShadow from 'leaflet/dist/images/marker-shadow.png';
-
 delete L.Icon.Default.prototype._getIconUrl;
 L.Icon.Default.mergeOptions({
-  iconUrl: markerIcon,
-  iconRetinaUrl: markerIcon2x,
-  shadowUrl: markerShadow,
+  iconUrl: "/marker-icon.png",
+  iconRetinaUrl: "/marker-icon-2x.png",
+  shadowUrl: "/marker-shadow.png",
 });
 
 // Component to handle map clicks
@@ -36,7 +39,7 @@ const MapCenterController = ({ centerLocation }) => {
     if (centerLocation) {
       // Fly to the location with a nice animation
       map.flyTo([centerLocation.y, centerLocation.x], 1, {
-        duration: 1.5
+        duration: 1.5,
       });
     }
   }, [centerLocation, map]);
@@ -44,25 +47,28 @@ const MapCenterController = ({ centerLocation }) => {
   return null;
 };
 
-const MapComponent = ({ 
-  mapImage, 
-  imageWidth = 1000, 
+const MapComponent = ({
+  mapImage,
+  imageWidth = 1000,
   imageHeight = 1000,
-  markers = [], 
+  markers = [],
   onMapClick,
   isSelectionMode = false,
   centerLocation = null,
-  className = 'h-full w-full'
+  className = "h-full w-full",
 }) => {
   const [mapKey, setMapKey] = useState(0);
 
   // Define bounds based on image dimensions
-  const bounds = [[0, 0], [imageHeight, imageWidth]];
+  const bounds = [
+    [0, 0],
+    [imageHeight, imageWidth],
+  ];
   const center = [imageHeight / 2, imageWidth / 2];
 
   // Force remount if image changes
   useEffect(() => {
-    setMapKey(prev => prev + 1);
+    setMapKey((prev) => prev + 1);
   }, [mapImage]);
 
   return (
@@ -75,33 +81,24 @@ const MapComponent = ({
       minZoom={-2}
       maxZoom={2}
       className={className}
-      style={{ background: '#1a1a1a' }}
+      style={{ background: "#347941" }}
     >
-      {mapImage && (
-        <ImageOverlay
-          url={mapImage}
-          bounds={bounds}
-        />
-      )}
+      {mapImage && <ImageOverlay url={`${mapImage}?v=${mapKey}`} bounds={bounds} />}
 
-      <LocationSelector 
-        onClick={onMapClick} 
+      <LocationSelector
+        onClick={onMapClick}
         isSelectionMode={isSelectionMode}
       />
 
       <MapCenterController centerLocation={centerLocation} />
 
       {markers.map((marker, index) => (
-        <Marker 
-          key={marker.id || index} 
+        <Marker
+          key={marker.id || index}
           position={[marker.y, marker.x]}
           icon={marker.icon || L.Icon.Default.prototype}
         >
-          {marker.popup && (
-            <Popup>
-              {marker.popup}
-            </Popup>
-          )}
+          {marker.popup && <Popup>{marker.popup}</Popup>}
         </Marker>
       ))}
     </MapContainer>
