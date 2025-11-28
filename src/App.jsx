@@ -2,6 +2,7 @@ import { BrowserRouter } from 'react-router-dom';
 import { Auth0Provider } from '@auth0/auth0-react';
 import { AuthProvider, useAuth } from './hooks/useAuth';
 import { UsersProvider } from './hooks/useUsers';
+import { JENbucksProvider } from './hooks/useJENbucks';
 import Home from './pages/Home';
 
 function AppContent() {
@@ -31,11 +32,22 @@ function App() {
       >
         <AuthProvider>
           <UsersProvider>
-            <AppContent />
+            <JENbucksWrapper>
+              <AppContent />
+            </JENbucksWrapper>
           </UsersProvider>
         </AuthProvider>
       </Auth0Provider>
     </BrowserRouter>
+  );
+}
+
+function JENbucksWrapper({ children }) {
+  const { user } = useAuth();
+  return (
+    <JENbucksProvider user={user}>
+      {children}
+    </JENbucksProvider>
   );
 }
 

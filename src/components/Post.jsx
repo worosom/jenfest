@@ -6,9 +6,12 @@ import {
   Trash2,
   Edit2,
   MessageCircle,
+  X,
+  ZoomIn,
 } from "lucide-react";
 import { collection, query, where, onSnapshot } from "firebase/firestore";
 import { db } from "../config/firebase";
+import { useJENbucks } from "../hooks/useJENbucks";
 import ProfilePicture from "./ProfilePicture";
 import PostRepliesModal from "./PostRepliesModal";
 import AttendeesModal from "./AttendeesModal";
@@ -31,6 +34,8 @@ const Post = ({
   const [showAttendees, setShowAttendees] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [replyCount, setReplyCount] = useState(0);
+  const [showLightbox, setShowLightbox] = useState(false);
+  const { postReactions, userReactions, addReaction } = useJENbucks();
 
   // Listen to reply count in real-time
   useEffect(() => {
@@ -106,12 +111,26 @@ const Post = ({
         </div>
 
         {!compact && post.media && post.media.length > 0 && (
-          <div className="rounded-lg overflow-hidden mb-3">
+          <div className="relative rounded-lg overflow-hidden mb-3 group">
             <img
               src={post.media[0].url}
               alt="Post media"
-              className="w-full max-h-[80vh] object-contain"
+              className="w-full max-h-[400px] object-contain cursor-pointer"
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowLightbox(true);
+              }}
             />
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowLightbox(true);
+              }}
+              className="absolute top-2 right-2 p-2 bg-black/50 text-white rounded-lg opacity-0 group-hover:opacity-100 transition-opacity"
+              title="View full size"
+            >
+              <ZoomIn size={20} />
+            </button>
           </div>
         )}
 
@@ -211,9 +230,30 @@ const Post = ({
           </div>
         )}
 
-        {/* Reply Button (for all posts) */}
+        {/* Reply and JENbucks buttons (for all posts) */}
         {!compact && (
-          <div className="flex items-center justify-end pt-3 mb-2 border-t border-[var(--color-warm-gray-300)]">
+          <div className="flex items-center justify-between pt-3 mb-2 border-t border-[var(--color-warm-gray-300)]">
+            {/* JENbucks Reaction */}
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                addReaction(post.id, post.authorId);
+              }}
+              className="flex items-center gap-1.5 px-2 py-1.5 bg-[var(--color-sunset-orange)] text-white hover:bg-[var(--color-sunset-orange)]/90 rounded-lg transition-colors font-medium"
+              title="React with JENbucks"
+            >
+              <img src="/jenbucks.png" alt="JENbucks" className="w-5 h-5" />
+              <span className="text-sm">
+                {postReactions[post.id] || 0}
+              </span>
+              {userReactions[post.id] > 0 && (
+                <span className="text-xs opacity-80">
+                  (You: {userReactions[post.id]})
+                </span>
+              )}
+            </button>
+
+            {/* Replies */}
             <button
               onClick={(e) => {
                 e.stopPropagation();
@@ -255,6 +295,28 @@ const Post = ({
           onClose={() => setShowEditModal(false)}
           post={post}
         />
+      )}
+
+      {/* Lightbox for full-size image */}
+      {showLightbox && post.media && post.media.length > 0 && (
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-95 flex items-center justify-center z-50 p-4"
+          onClick={() => setShowLightbox(false)}
+        >
+          <button
+            onClick={() => setShowLightbox(false)}
+            className="absolute top-4 right-4 p-2 bg-white/10 hover:bg-white/20 text-white rounded-full transition-colors"
+            title="Close"
+          >
+            <X size={24} />
+          </button>
+          <img
+            src={post.media[0].url}
+            alt="Post media"
+            className="max-w-full max-h-full object-contain"
+            onClick={(e) => e.stopPropagation()}
+          />
+        </div>
       )}
     </>
   );

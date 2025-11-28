@@ -12,7 +12,7 @@ const MapView = ({ onViewUserProfile }) => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { users } = useUsers();
-  const [markers, setMarkers] = useState(undefined); // Start as undefined to distinguish from empty
+  const [markers, setMarkers] = useState([]); // Start with empty array
   const [selectedCoords, setSelectedCoords] = useState(null);
   const [allUsers, setAllUsers] = useState([]);
   const [allPosts, setAllPosts] = useState([]);
@@ -30,32 +30,48 @@ const MapView = ({ onViewUserProfile }) => {
   // Listen to users for camp locations
   useEffect(() => {
     const usersQuery = query(collection(db, "users"));
-    const unsubscribe = onSnapshot(usersQuery, (snapshot) => {
-      const usersArray = snapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      }));
-      setAllUsers(usersArray);
-    });
-    return unsubscribe;
+    const unsubscribe = onSnapshot(
+      usersQuery, 
+      (snapshot) => {
+        const usersArray = snapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        }));
+        setAllUsers(usersArray);
+      },
+      (error) => {
+        console.error('MapView: Error in users subscription:', error);
+      }
+    );
+    return () => {
+      unsubscribe();
+    };
   }, []);
 
   // Listen to posts
   useEffect(() => {
     const postsQuery = query(collection(db, "posts"));
-    const unsubscribe = onSnapshot(postsQuery, (snapshot) => {
-      const postsArray = snapshot.docs
-        .map((doc) => ({
-          id: doc.id,
-          ...doc.data(),
-        }))
-        .filter((post) => {
-          // Only show published posts
-          return post.published !== false; // Default to true if not set
-        });
-      setAllPosts(postsArray);
-    });
-    return unsubscribe;
+    const unsubscribe = onSnapshot(
+      postsQuery, 
+      (snapshot) => {
+        const postsArray = snapshot.docs
+          .map((doc) => ({
+            id: doc.id,
+            ...doc.data(),
+          }))
+          .filter((post) => {
+            // Only show published posts
+            return post.published !== false; // Default to true if not set
+          });
+        setAllPosts(postsArray);
+      },
+      (error) => {
+        console.error('MapView: Error in posts subscription:', error);
+      }
+    );
+    return () => {
+      unsubscribe();
+    };
   }, []);
 
   // Rebuild markers when users or posts change

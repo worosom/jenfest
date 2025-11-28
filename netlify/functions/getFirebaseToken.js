@@ -45,8 +45,10 @@ export const handler = async (event) => {
     const userInfo = await userInfoResponse.json();
     const userId = userInfo.sub; // Auth0 user ID
 
-    // Create a Firebase custom token
-    const firebaseToken = await admin.auth().createCustomToken(userId);
+    // Create a Firebase custom token with email claim
+    const firebaseToken = await admin.auth().createCustomToken(userId, {
+      email: userInfo.email,
+    });
 
     return {
       statusCode: 200,

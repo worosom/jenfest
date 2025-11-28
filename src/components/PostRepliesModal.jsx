@@ -165,23 +165,35 @@ const PostRepliesModal = ({ isOpen, onClose, post, onViewUserProfile }) => {
         {/* Post Preview */}
         <div className="p-4 bg-[var(--color-warm-gray-100)] border-b border-[var(--color-warm-gray-300)]">
           <div className="flex items-start gap-3">
-            <button
-              onClick={() => onViewUserProfile?.(post.authorId)}
-              className="flex-shrink-0"
-            >
-              <ProfilePicture
-                src={users[post.authorId]?.photoURL}
-                alt={users[post.authorId]?.displayName || 'User'}
-                size="sm"
-              />
-            </button>
-            <div className="flex-1 min-w-0">
+            {post.authorId === 'system' ? (
+              <div className="flex-shrink-0 w-10 h-10 bg-[var(--color-clay)] rounded-full flex items-center justify-center">
+                <MessageCircle size={20} className="text-white" />
+              </div>
+            ) : (
               <button
                 onClick={() => onViewUserProfile?.(post.authorId)}
-                className="text-sm font-semibold text-[var(--color-text-primary)] hover:text-[var(--color-clay)] transition-colors"
+                className="flex-shrink-0"
               >
-                {users[post.authorId]?.displayName || 'Anonymous'}
+                <ProfilePicture
+                  src={users[post.authorId]?.photoURL}
+                  alt={users[post.authorId]?.displayName || 'User'}
+                  size="sm"
+                />
               </button>
+            )}
+            <div className="flex-1 min-w-0">
+              {post.authorId === 'system' ? (
+                <span className="text-sm font-semibold text-[var(--color-text-primary)]">
+                  Jenfest Esports™
+                </span>
+              ) : (
+                <button
+                  onClick={() => onViewUserProfile?.(post.authorId)}
+                  className="text-sm font-semibold text-[var(--color-text-primary)] hover:text-[var(--color-clay)] transition-colors"
+                >
+                  {users[post.authorId]?.displayName || 'Anonymous'}
+                </button>
+              )}
               {post.title && (
                 <p className="font-semibold text-[var(--color-text-primary)] mt-1">
                   {post.title}

@@ -8,6 +8,7 @@ import {
 } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import { useUnreadMessages } from "../hooks/useUnreadMessages";
+import { useJENbucks } from "../hooks/useJENbucks";
 import {
   Map,
   Calendar,
@@ -30,15 +31,18 @@ import PostDetail from "./PostDetail";
 import TermsOfService from "./TermsOfService";
 import PrivacyPolicy from "./PrivacyPolicy";
 import CookiePolicy from "./CookiePolicy";
+import AdminTools from "./AdminTools";
 import PostFormModal from "../components/PostFormModal";
 import LoginModal from "../components/LoginModal";
 import DirectMessagesModal from "../components/DirectMessagesModal";
 import WelcomeModal from "../components/HelpModal";
 import AudioPlayer from "../components/AudioPlayer";
+import OfflineIndicator from "../components/OfflineIndicator";
 
 const Home = () => {
   const { user, signOut } = useAuth();
   const unreadCount = useUnreadMessages();
+  const { balance } = useJENbucks();
   const navigate = useNavigate();
   const location = useLocation();
   const [isCreatePostOpen, setIsCreatePostOpen] = useState(false);
@@ -95,6 +99,9 @@ const Home = () => {
 
   return (
     <div className="h-[100dvh] bg-[var(--color-bg-primary)] flex flex-col overflow-hidden">
+      {/* Offline Indicator */}
+      <OfflineIndicator />
+      
       {/* Header */}
       {!isLegalPage && (
         <header className="bg-[var(--color-leather-dark)] shadow-lg border-b border-[var(--color-leather)] flex-shrink-0 z-10">
@@ -112,6 +119,12 @@ const Home = () => {
 
             {user ? (
               <div className="flex items-center gap-2">
+                {/* JENbucks Balance */}
+                <div className="flex items-center gap-1 bg-[var(--color-sunset-orange)] text-white px-2 py-1 rounded-full font-bold text-sm">
+                  <img src="/jenbucks.png" alt="JENbucks" className="w-5 h-5" />
+                  <span>{balance}</span>
+                </div>
+                
                 <button
                   onClick={() => setIsWelcomeOpen(true)}
                   className="p-2 text-[var(--color-sand)] hover:text-[var(--color-sand-light)] hover:bg-[var(--color-leather)] rounded-lg transition-colors flex items-center gap-2"
@@ -178,6 +191,11 @@ const Home = () => {
 
       {/* Main Content - Scrollable */}
       <main className="flex-1 overflow-y-auto overflow-x-hidden">
+        {/* Keep MapView mounted but hidden to preserve map state */}
+        <div style={{ display: location.pathname === '/map' ? 'block' : 'none', height: '100%' }}>
+          <MapView onViewUserProfile={handleViewUserProfile} />
+        </div>
+        
         <Routes>
           <Route
             path="/"
@@ -197,7 +215,7 @@ const Home = () => {
           />
           <Route
             path="/map"
-            element={<MapView onViewUserProfile={handleViewUserProfile} />}
+            element={<div />}
           />
           <Route
             path="/schedule"
@@ -256,6 +274,10 @@ const Home = () => {
           <Route
             path="/cookies"
             element={<CookiePolicy onBack={() => navigate(-1)} />}
+          />
+          <Route
+            path="/admin"
+            element={user ? <AdminTools /> : <Feed onViewUserProfile={handleViewUserProfile} onNavigateToMap={(location, postId) => navigate("/map", { state: { centerLocation: location, highlightMarkerId: postId ? `post-${postId}` : null } })} />}
           />
         </Routes>
       </main>

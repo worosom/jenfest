@@ -151,26 +151,11 @@ const GoogleMapComponent = ({
 
   // Create AdvancedMarkerElements for custom markers
   useEffect(() => {
-    if (!map || !window.google?.maps?.marker) return;
-
-    // Skip if markers is undefined (not loaded yet) - keep existing markers on map
-    if (markers === undefined) {
+    if (!map || !window.google?.maps?.marker) {
       return;
     }
 
-    // If markers is explicitly an empty array, clear custom markers
-    if (markers.length === 0) {
-      const customMarkers = markersRef.current.filter((m) => m.customMarker);
-      customMarkers.forEach((marker) => {
-        if (marker && marker.map) {
-          marker.map = null;
-        }
-      });
-      markersRef.current = markersRef.current.filter((m) => !m.customMarker);
-      return;
-    }
-
-    // Clean up existing custom markers
+    // Always clean up existing custom markers first
     const customMarkers = markersRef.current.filter((m) => m.customMarker);
     customMarkers.forEach((marker) => {
       if (marker && marker.map) {
@@ -178,6 +163,11 @@ const GoogleMapComponent = ({
       }
     });
 
+    // If markers array is empty, just clear and return
+    if (!markers || markers.length === 0) {
+      markersRef.current = markersRef.current.filter((m) => !m.customMarker);
+      return;
+    }
     // Create new custom markers
     const newMarkers = markers.map((marker) => {
       // Create custom content based on icon
@@ -230,13 +220,8 @@ const GoogleMapComponent = ({
       ...newMarkers,
     ];
 
-    return () => {
-      newMarkers.forEach((marker) => {
-        if (marker && marker.map) {
-          marker.map = null;
-        }
-      });
-    };
+    // Don't clean up markers on unmount of this effect - let them persist
+    // They'll be cleaned up when new markers are created or component unmounts
   }, [map, markers, isSelectionMode]);
 
   // Helper function to calculate polygon center
@@ -502,4 +487,3 @@ const GoogleMapComponent = ({
 };
 
 export default GoogleMapComponent;
-

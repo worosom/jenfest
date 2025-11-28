@@ -209,6 +209,19 @@ const HelpModal = ({ isOpen, onClose }) => {
                   </p>
                 </div>
               </div>
+
+              <div className="flex items-start gap-3">
+                <img src="/jenbucks.png" alt="JENbucks" className="w-5 h-5 mt-0.5 flex-shrink-0" />
+                <div>
+                  <p className="text-[var(--color-text-secondary)] text-sm">
+                    <strong className="text-[var(--color-text-primary)]">
+                      React with JENbucks:
+                    </strong>{" "}
+                    Everyone starts with 500 JENbucks! React to posts you love by spending JENbucks. 
+                    Post authors earn the JENbucks spent on their posts. Use them wisely!
+                  </p>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -276,4 +289,3 @@ const HelpModal = ({ isOpen, onClose }) => {
 };
 
 export default HelpModal;
-

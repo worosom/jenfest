@@ -1,6 +1,6 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
-import { getFirestore, enableIndexedDbPersistence } from 'firebase/firestore';
+import { getFirestore, initializeFirestore, persistentLocalCache, persistentMultipleTabManager } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 
 // Firebase configuration from environment variables
@@ -25,16 +25,26 @@ const app = initializeApp(firebaseConfig);
 
 // Initialize services
 export const auth = getAuth(app);
-export const db = getFirestore(app);
-export const storage = getStorage(app);
 
-// Enable offline persistence for instant data after page reloads
-enableIndexedDbPersistence(db).catch((err) => {
-  if (err.code === 'failed-precondition') {
-    console.warn('Firestore persistence failed: Multiple tabs open');
-  } else if (err.code === 'unimplemented') {
-    console.warn('Firestore persistence not available in this browser');
-  }
-});
+// Initialize Firestore with modern persistent cache API (supports multiple tabs)
+// This enables offline persistence - data is cached locally and available offline
+let db;
+try {
+  db = initializeFirestore(app, {
+    localCache: persistentLocalCache({
+      tabManager: persistentMultipleTabManager()
+    })
+  });
+  console.log('✅ Firestore initialized with persistent offline cache enabled');
+  console.log('📱 Your data will be available offline!');
+} catch (error) {
+  // If persistent cache fails (e.g., in private browsing), fall back to default
+  console.warn('⚠️ Failed to initialize Firestore with persistent cache:', error);
+  console.warn('📡 Firestore will work online only');
+  db = getFirestore(app);
+}
+
+export { db };
+export const storage = getStorage(app);
 
 export default app;

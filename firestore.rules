@@ -49,5 +49,33 @@ service cloud.firestore {
       allow delete: if request.auth != null 
                     && request.auth.uid == resource.data.userId;
     }
+
+    // JENbucks balances
+    match /jenbucks/{userId} {
+      // Anyone can read balances
+      allow read: if true;
+      // Only the user can create their own balance (initial setup)
+      // OR allow creation if called from backend (no auth context means server-side)
+      allow create: if (request.auth != null 
+                    && request.auth.uid == userId
+                    && request.resource.data.userId == userId)
+                    || request.auth == null;
+      // Only the user can update their own balance, and only to decrement
+      allow update: if request.auth != null 
+                    && request.auth.uid == userId
+                    && request.resource.data.balance <= resource.data.balance;
+    }
+
+    // JENbucks reactions
+    match /jenbucksReactions/{reactionId} {
+      // Anyone can read reactions
+      allow read: if true;
+      // Only authenticated users can create reactions for themselves
+      allow create: if request.auth != null 
+                    && request.resource.data.userId == request.auth.uid
+                    && request.resource.data.amount == 1;
+      // No updates or deletes allowed (reactions are permanent)
+      allow update, delete: if false;
+    }
   }
 }

@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { MessageCircle, Gamepad2, Maximize2, X } from "lucide-react";
 import { collection, query, where, onSnapshot } from "firebase/firestore";
 import { db } from "../config/firebase";
+import { useJENbucks } from "../hooks/useJENbucks";
 import ProfilePicture from "./ProfilePicture";
 import PostRepliesModal from "./PostRepliesModal";
 
@@ -9,6 +10,7 @@ const GamePost = ({ post, currentUserId, author, onViewUserProfile }) => {
   const [showReplies, setShowReplies] = useState(false);
   const [replyCount, setReplyCount] = useState(0);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const { postReactions, userReactions, addReaction } = useJENbucks();
 
   // Listen to reply count in real-time
   useEffect(() => {
@@ -120,7 +122,7 @@ const GamePost = ({ post, currentUserId, author, onViewUserProfile }) => {
                 </div>
                 <div className="flex flex-col">
                   <span className="text-xs text-[var(--color-text-secondary)] font-medium">
-                    Jenfest Esports
+                    Jenfest Esports™
                   </span>
                   <p className="text-xs text-[var(--color-text-light)]">
                     {post.createdAt?.toLocaleDateString?.() || ""}
@@ -143,8 +145,29 @@ const GamePost = ({ post, currentUserId, author, onViewUserProfile }) => {
           )}
         </div>
 
-        {/* Reply Button */}
-        <div className="flex items-center justify-end pt-3 border-t border-[var(--color-warm-gray-300)]">
+        {/* Reply and JENbucks buttons */}
+        <div className="flex items-center justify-between pt-3 border-t border-[var(--color-warm-gray-300)]">
+          {/* JENbucks Reaction */}
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              addReaction(post.id, post.authorId);
+            }}
+            className="flex items-center gap-1.5 px-2 py-1.5 bg-[var(--color-sunset-orange)] text-white hover:bg-[var(--color-sunset-orange)]/90 rounded-lg transition-colors font-medium"
+            title="React with JENbucks"
+          >
+            <img src="/jenbucks.png" alt="JENbucks" className="w-5 h-5" />
+            <span className="text-sm">
+              {postReactions[post.id] || 0}
+            </span>
+            {userReactions[post.id] > 0 && (
+              <span className="text-xs opacity-80">
+                (You: {userReactions[post.id]})
+              </span>
+            )}
+          </button>
+
+          {/* Replies */}
           <button
             onClick={(e) => {
               e.stopPropagation();
@@ -207,4 +230,3 @@ const GamePost = ({ post, currentUserId, author, onViewUserProfile }) => {
 };
 
 export default GamePost;
-
